@@ -10,6 +10,14 @@ SourceLocation :: struct {
 	column:   uint,
 }
 
+SourceLocation_ToString :: proc(
+	location: SourceLocation,
+	allocator := context.allocator,
+) -> string {
+	context.allocator = allocator
+	return fmt.aprintf("%s:%u:%u", location.filepath, location.line, location.column)
+}
+
 TokenKind :: enum {
 	Invalid,
 

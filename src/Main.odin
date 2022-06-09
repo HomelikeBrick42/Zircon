@@ -12,6 +12,15 @@ SetupFormatters :: proc() {
 	formatters: map[typeid]fmt.User_Formatter
 	fmt.set_user_formatters(&formatters)
 
+	WriteSourceLocation :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
+		_, err := io.write_string(
+			fi.writer,
+			SourceLocation_ToString(arg.(SourceLocation), context.temp_allocator),
+		)
+		return err != nil
+	}
+	fmt.register_user_formatter(typeid_of(SourceLocation), WriteSourceLocation)
+
 	WriteTokenKind :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 		_, err := io.write_string(fi.writer, TokenKind_ToString(arg.(TokenKind)))
 		return err != nil
