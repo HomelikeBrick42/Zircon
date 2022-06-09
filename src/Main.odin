@@ -1,10 +1,46 @@
 package zircon
 
 import "core:io"
+import "core:os"
 import "core:fmt"
 
 main :: proc() {
 	SetupFormatters()
+
+	program_name := os.args[0]
+	if len(os.args) != 3 {
+		fmt.eprintf("Usage: %s <command> <file>\n", program_name)
+		os.exit(1)
+	}
+
+	filepath := os.args[2]
+	bytes, ok := os.read_entire_file(filepath)
+	if !ok {
+		fmt.eprintf("Unable to open file '%s'\n", filepath)
+		os.exit(1)
+	}
+	defer delete(bytes)
+	source := string(bytes)
+
+	command := os.args[1]
+	switch command {
+	case "show_tokens":
+		lexer: Lexer
+		Lexer_Init(&lexer, filepath, source)
+		for {
+			token, error := Lexer_NextToken(&lexer)
+			if error, ok := error.?; ok {
+				fmt.eprintf("%v: %s\n", error.location, error.message)
+				os.exit(1)
+			}
+			fmt.println(token)
+			if token.kind == .EndOfFile do break
+		}
+	case:
+		fmt.eprintf("Unknown command '%s'\n", command)
+		os.exit(1)
+	}
+	return
 }
 
 SetupFormatters :: proc() {

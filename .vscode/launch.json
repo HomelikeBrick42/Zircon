@@ -9,7 +9,10 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Zircon.exe",
-            "args": [],
+            "args": [
+                "show_tokens",
+                "test.zircon",
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

@@ -57,7 +57,7 @@ TokenKind_GetCharKind :: proc(chr: rune) -> Maybe(TokenKind) {
 	switch chr {
 	case 0:
 		return .EndOfFile
-	case '\n', '\r':
+	case '\n':
 		return .Newline
 	case '(':
 		return .OpenParenthesis
@@ -86,8 +86,6 @@ TokenKind_GetCharKind :: proc(chr: rune) -> Maybe(TokenKind) {
 
 TokenKind_GetDoubleCharKind :: proc(first: rune, second: rune) -> Maybe(TokenKind) {
 	switch ([2]rune{first, second}) {
-	case {'\n', '\r'}, {'\r', '\n'}:
-		return .Newline
 	case {'=', '='}:
 		return .EqualEqual
 	case {'!', '='}:
