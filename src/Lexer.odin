@@ -73,11 +73,68 @@ Lexer_NextToken :: proc(lexer: ^Lexer) -> (token: Token, error: Maybe(Error)) {
 		}
 
 		if Lexer_CurrentChar(lexer^) >= '0' && Lexer_CurrentChar(lexer^) <= '9' {
-			error = Error {
-				location = start_location,
-				message  = fmt.aprintf("integer lexing is not implemented :)"),
+			base := u128(10)
+			if Lexer_CurrentChar(lexer^) == '0' {
+				Lexer_NextChar(lexer)
+				switch Lexer_CurrentChar(lexer^) {
+				case 'b':
+					Lexer_NextChar(lexer)
+					base = 2
+				case 'o':
+					Lexer_NextChar(lexer)
+					base = 8
+				case 'd':
+					Lexer_NextChar(lexer)
+					base = 10
+				case 'x':
+					Lexer_NextChar(lexer)
+					base = 16
+				}
 			}
-			return {}, error
+
+			value: u128
+			for
+			    (Lexer_CurrentChar(lexer^) >= '0' && Lexer_CurrentChar(lexer^) <= '9') || (Lexer_CurrentChar(
+				    lexer^,
+			    ) >= 'A' && Lexer_CurrentChar(lexer^) <= 'Z') || (Lexer_CurrentChar(lexer^) >= 'a' &&
+			    Lexer_CurrentChar(lexer^) <= 'z') || Lexer_CurrentChar(lexer^) == '_' {
+				digit_location := lexer.location
+				chr := Lexer_NextChar(lexer)
+
+				digit_value: u128
+				if chr >= '0' && chr <= '9' {
+					digit_value = u128(chr) - '0'
+				} else if chr >= 'A' && chr <= 'Z' {
+					digit_value = u128(chr) - 'A' + 10
+				} else if chr >= 'a' && chr <= 'z' {
+					digit_value = u128(chr) - 'a' + 10
+				} else {
+					unreachable()
+				}
+
+				if digit_value >= base {
+					error = Error {
+						location = digit_location,
+						message  = fmt.aprintf(
+							"Digit '%c' (%d) is too big for base %d",
+							chr,
+							digit_value,
+							base,
+						),
+					}
+					return {}, error
+				}
+
+				value *= base
+				value += digit_value
+			}
+
+			return Token{
+				kind = .Integer,
+				location = start_location,
+				length = lexer.position - start_location.position,
+				data = value,
+			}, nil
 		}
 
 		chr := Lexer_NextChar(lexer)

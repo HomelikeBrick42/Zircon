@@ -1,3 +1,4 @@
-hello := idk + foo
-some_name1234 := hello !=
-                something
+a := 42
+a = a + 5 * -10
+print_int(a)
+println()

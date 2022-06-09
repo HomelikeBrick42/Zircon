@@ -155,7 +155,7 @@ Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))
 	case .Integer:
-		return fmt.aprintf("%u", token.data.(u128))
+		return fmt.aprintf("%d", token.data.(u128))
 	}
 	return strings.clone(TokenKind_ToString(token.kind))
 }
