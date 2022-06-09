@@ -19,13 +19,13 @@ SetupFormatters :: proc() {
 		)
 		return err != nil
 	}
-	fmt.register_user_formatter(typeid_of(SourceLocation), WriteSourceLocation)
+	fmt.register_user_formatter(SourceLocation, WriteSourceLocation)
 
 	WriteTokenKind :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 		_, err := io.write_string(fi.writer, TokenKind_ToString(arg.(TokenKind)))
 		return err != nil
 	}
-	fmt.register_user_formatter(typeid_of(TokenKind), WriteTokenKind)
+	fmt.register_user_formatter(TokenKind, WriteTokenKind)
 
 	WriteToken :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 		_, err := io.write_string(
@@ -34,5 +34,5 @@ SetupFormatters :: proc() {
 		)
 		return err != nil
 	}
-	fmt.register_user_formatter(typeid_of(Token), WriteToken)
+	fmt.register_user_formatter(Token, WriteToken)
 }
