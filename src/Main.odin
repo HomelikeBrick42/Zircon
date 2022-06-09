@@ -33,7 +33,7 @@ main :: proc() {
 				fmt.eprintf("%v: %s\n", error.location, error.message)
 				os.exit(1)
 			}
-			fmt.println(token)
+			fmt.printf("%v: %v\n", token.location, token)
 			if token.kind == .EndOfFile do break
 		}
 	case:
