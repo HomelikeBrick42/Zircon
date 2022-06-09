@@ -81,7 +81,7 @@ Lexer_NextToken :: proc(lexer: ^Lexer) -> (token: Token, error: Maybe(Error)) {
 		}
 
 		chr := Lexer_NextChar(lexer)
-		if chr == ' ' || chr == '\t' {
+		if chr == ' ' || chr == '\t' || chr == '\r' {
 			continue
 		}
 

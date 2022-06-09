@@ -15,7 +15,7 @@ SourceLocation_ToString :: proc(
 	allocator := context.allocator,
 ) -> string {
 	context.allocator = allocator
-	return fmt.aprintf("%s:%u:%u", location.filepath, location.line, location.column)
+	return fmt.aprintf("%s:%d:%d", location.filepath, location.line, location.column)
 }
 
 TokenKind :: enum {
