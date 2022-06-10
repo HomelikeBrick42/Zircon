@@ -11,8 +11,9 @@ main :: proc() {
 	if len(os.args) != 3 {
 		fmt.eprintf("Usage: %s <command> <file>\n", program_name)
 		fmt.eprintf("Commands:\n")
-		fmt.eprintf("    show_tokens - lexes the file and then prints the tokens\n")
-		fmt.eprintf("    show_ast    - lexes and parses the file and then prints the ast\n")
+		fmt.eprintf("    show_tokens - prints all of the tokens in the file\n")
+		fmt.eprintf("    show_ast    - prints the ast\n")
+		fmt.eprintf("    check_ast   - type checks the ast\n")
 		fmt.eprintf("    run         - executes the file\n")
 		os.exit(1)
 	}
@@ -42,6 +43,26 @@ main :: proc() {
 		}
 	case "show_ast":
 		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		DumpAst(ast, 0)
+	case "check_ast":
+		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		names: [dynamic]Scope
+		defer {
+			for scope in names {
+				delete(scope)
+			}
+			delete(names)
+		}
+		append(&names, Scope{"print_int" = Builtin.PrintInt, "println" = Builtin.Println})
+		error = ResolveAst(ast, &names)
 		if error, ok := error.?; ok {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)

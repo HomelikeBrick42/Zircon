@@ -28,11 +28,12 @@ AstFile :: struct {
 }
 
 AstDeclaration :: struct {
-	name_token:  Token,
-	colon_token: Token,
+	resolved_type: Type,
+	name_token:    Token,
+	colon_token:   Token,
 	// TODO: add type
-	equal_token: Token,
-	value:       AstExpression,
+	equal_token:   Token,
+	value:         AstExpression,
 }
 
 AstAssignment :: struct {
@@ -49,6 +50,7 @@ UnaryOperatorKind :: enum {
 }
 
 AstUnary :: struct {
+	type:           Type,
 	operator_kind:  UnaryOperatorKind,
 	operator_token: Token,
 	operand:        AstExpression,
@@ -65,6 +67,7 @@ BinaryOperatorKind :: enum {
 }
 
 AstBinary :: struct {
+	type:           Type,
 	left:           AstExpression,
 	operator_kind:  BinaryOperatorKind,
 	operator_token: Token,
@@ -72,6 +75,7 @@ AstBinary :: struct {
 }
 
 AstCall :: struct {
+	type:                    Type,
 	operand:                 AstExpression,
 	open_parenthesis_token:  Token,
 	arguments:               [dynamic]AstExpression,
@@ -79,11 +83,30 @@ AstCall :: struct {
 }
 
 AstName :: struct {
+	type:       Type,
 	name_token: Token,
 }
 
 AstInteger :: struct {
+	type:          Type,
 	integer_token: Token,
+}
+
+GetType :: proc(expression: AstExpression) -> Type {
+	switch expression in expression {
+	case ^AstUnary:
+		return expression.type
+	case ^AstBinary:
+		return expression.type
+	case ^AstCall:
+		return expression.type
+	case ^AstName:
+		return expression.type
+	case ^AstInteger:
+		return expression.type
+	case:
+		unreachable()
+	}
 }
 
 DumpAst :: proc(ast: Ast, indent: uint) {
@@ -93,9 +116,16 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 		}
 	}
 
-	PrintHeader :: proc(title: string, location: SourceLocation, indent: uint) {
+	PrintHeader :: proc(title: string, location: SourceLocation, type: Type, indent: uint) {
 		PrintIndent(indent)
-		fmt.printf("- %s: Location: %v\n", title, location)
+		fmt.println("-", title)
+		PrintIndent(indent + 1)
+		fmt.println("Location:", location)
+		if type != nil {
+			PrintIndent(indent + 1)
+			fmt.println("Type:")
+			DumpType(type, indent + 2)
+		}
 	}
 
 	switch ast in ast {
@@ -108,6 +138,7 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				line = 1,
 				column = 1,
 			},
+			nil,
 			indent,
 		)
 		PrintIndent(indent + 1)
@@ -118,14 +149,19 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 	case AstStatement:
 		switch ast in ast {
 		case ^AstDeclaration:
-			PrintHeader("Declaration", ast.name_token.location, indent)
+			PrintHeader("Declaration", ast.name_token.location, nil, indent)
 			PrintIndent(indent + 1)
 			fmt.printf("Name: '%s'\n", ast.name_token.data.(string))
+			if ast.resolved_type != nil {
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpType(ast.resolved_type, indent + 2)
+			}
 			PrintIndent(indent + 1)
 			fmt.println("Value:")
 			DumpAst(AstStatement(ast.value), indent + 2)
 		case ^AstAssignment:
-			PrintHeader("Assignment", ast.equal_token.location, indent)
+			PrintHeader("Assignment", ast.equal_token.location, nil, indent)
 			PrintIndent(indent + 1)
 			fmt.println("Operand:")
 			DumpAst(AstStatement(ast.operand), indent + 2)
@@ -135,14 +171,14 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 		case AstExpression:
 			switch ast in ast {
 			case ^AstUnary:
-				PrintHeader("Unary", ast.operator_token.location, indent)
+				PrintHeader("Unary", ast.operator_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.println("Unary Operator:", ast.operator_kind)
 				PrintIndent(indent + 1)
 				fmt.println("Operand:")
 				DumpAst(AstStatement(ast.operand), indent + 2)
 			case ^AstBinary:
-				PrintHeader("Binary", ast.operator_token.location, indent)
+				PrintHeader("Binary", ast.operator_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.println("Binary Operator:", ast.operator_kind)
 				PrintIndent(indent + 1)
@@ -152,7 +188,7 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				fmt.println("Right:")
 				DumpAst(AstStatement(ast.right), indent + 2)
 			case ^AstCall:
-				PrintHeader("Call", ast.open_parenthesis_token.location, indent)
+				PrintHeader("Call", ast.open_parenthesis_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.println("Operand:")
 				DumpAst(AstStatement(ast.operand), indent + 2)
@@ -162,11 +198,11 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 					DumpAst(AstStatement(argument), indent + 2)
 				}
 			case ^AstName:
-				PrintHeader("Name", ast.name_token.location, indent)
+				PrintHeader("Name", ast.name_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.printf("Value: '%s'\n", ast.name_token.data.(string))
 			case ^AstInteger:
-				PrintHeader("Integer", ast.integer_token.location, indent)
+				PrintHeader("Integer", ast.integer_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.println("Value:", ast.integer_token.data.(u128))
 			case:
