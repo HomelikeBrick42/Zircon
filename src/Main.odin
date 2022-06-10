@@ -13,6 +13,7 @@ main :: proc() {
 		fmt.eprintf("Commands:\n")
 		fmt.eprintf("    show_tokens - lexes the file and then prints the tokens\n")
 		fmt.eprintf("    show_ast    - lexes and parses the file and then prints the ast\n")
+		fmt.eprintf("    run         - executes the file\n")
 		os.exit(1)
 	}
 
@@ -46,6 +47,28 @@ main :: proc() {
 			os.exit(1)
 		}
 		DumpAst(ast, 0)
+	case "run":
+		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		names: [dynamic]map[string]Value
+		defer {
+			for scope in names {
+				delete(scope)
+			}
+			delete(names)
+		}
+		append(
+			&names,
+			map[string]Value{"print_int" = Builtin.PrintInt, "println" = Builtin.Println},
+		)
+		error = EvalAst(ast, &names)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
 	case:
 		fmt.eprintf("Unknown command '%s'\n", command)
 		os.exit(1)

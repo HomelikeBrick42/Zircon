@@ -95,7 +95,7 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 
 	PrintHeader :: proc(title: string, location: SourceLocation, indent: uint) {
 		PrintIndent(indent)
-		fmt.printf("- %s: %v\n", title, location)
+		fmt.printf("- %s: Location: %v\n", title, location)
 	}
 
 	switch ast in ast {

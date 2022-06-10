@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Zircon.exe",
             "args": [
-                "show_ast",
+                "run",
                 "test.zircon",
             ],
             "stopAtEntry": false,
