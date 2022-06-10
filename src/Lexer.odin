@@ -168,3 +168,18 @@ Lexer_NextToken :: proc(lexer: ^Lexer) -> (token: Token, error: Maybe(Error)) {
 		return {}, error
 	}
 }
+
+Lexer_ExpectToken :: proc(lexer: ^Lexer, kind: TokenKind) -> (
+	token: Token,
+	error: Maybe(Error),
+) {
+	token = Lexer_NextToken(lexer) or_return
+	if token.kind != kind {
+		error = Error {
+			location = token.location,
+			message  = fmt.aprintf("Expected %v, but got %v", kind, token),
+		}
+		return {}, error
+	}
+	return token, nil
+}

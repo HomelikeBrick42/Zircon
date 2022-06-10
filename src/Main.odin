@@ -10,6 +10,9 @@ main :: proc() {
 	program_name := os.args[0]
 	if len(os.args) != 3 {
 		fmt.eprintf("Usage: %s <command> <file>\n", program_name)
+		fmt.eprintf("Commands:\n")
+		fmt.eprintf("    show_tokens - lexes the file and then prints the tokens\n")
+		fmt.eprintf("    show_ast    - lexes and parses the file and then prints the ast\n")
 		os.exit(1)
 	}
 
@@ -36,6 +39,13 @@ main :: proc() {
 			fmt.printf("%v: %v\n", token.location, token)
 			if token.kind == .EndOfFile do break
 		}
+	case "show_ast":
+		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		DumpAst(ast, 0)
 	case:
 		fmt.eprintf("Unknown command '%s'\n", command)
 		os.exit(1)
