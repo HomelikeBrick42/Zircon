@@ -87,6 +87,13 @@ int main() {{
 			EmitStatement_C(statement, names, indent + 2, buffer)
 		}
 		delete(pop(names))
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			ast.end_of_file_token.line,
+			ast.end_of_file_token.filepath,
+		)
+		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, `        return 0;
     }}
 }}
@@ -108,11 +115,23 @@ EmitStatement_C :: proc(
 	case ^AstScope:
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// scope\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.open_brace_token.line,
+			statement.open_brace_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "{{\n")
 		for statement in statement.statements {
 			EmitStatement_C(statement, names, indent + 1, buffer)
 		}
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.close_brace_token.line,
+			statement.close_brace_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "}}\n")
 	case ^AstDeclaration:
@@ -120,6 +139,12 @@ EmitStatement_C :: proc(
 		name := statement.name_token.data.(string)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// declaration of '%s'\n", name)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.name_token.line,
+			statement.name_token.filepath,
+		)
 		EmitType_C(
 			statement.resolved_type,
 			fmt.tprintf("_%d", uintptr(statement)),
@@ -133,16 +158,34 @@ EmitStatement_C :: proc(
 		value := EmitExpression_C(statement.value, names, indent, buffer)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// assignment\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.equal_token.line,
+			statement.equal_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "*_%d = _%d;\n", operand, value)
 	case ^AstIf:
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// if\n")
 		condition := EmitExpression_C(statement.condition, names, indent, buffer)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.if_token.line,
+			statement.if_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "if (_%d)\n", condition)
 		EmitStatement_C(statement.then_body, names, indent, buffer)
 		if else_body, ok := statement.else_body.?; ok {
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				statement.else_token.line,
+				statement.else_token.filepath,
+			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "else\n")
 			EmitStatement_C(else_body, names, indent, buffer)
@@ -176,6 +219,12 @@ EmitAddressOf_C :: proc(
 					PrintIndent(indent, buffer)
 					fmt.sbprintf(buffer, "// get address of '%s'\n", name)
 					id := GetID()
+					fmt.sbprintf(
+						buffer,
+						"#line %d \"%s\"\n",
+						expression.name_token.line,
+						expression.name_token.filepath,
+					)
 					EmitType_C(
 						GetPointerType(decl.resolved_type),
 						fmt.tprintf("_%d", id),
@@ -215,6 +264,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// unary +\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = +_%d;\n", operand)
 			return id
@@ -222,6 +277,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// unary -\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = -_%d;\n", operand)
 			return id
@@ -229,6 +290,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// unary !\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = !_%d;\n", operand)
 			return id
@@ -245,6 +312,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary +\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, "  = _%d + _%d;\n", left, right)
 			return id
@@ -252,6 +325,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary -\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d - _%d;\n", left, right)
 			return id
@@ -259,6 +338,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary *\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d * _%d;\n", left, right)
 			return id
@@ -266,6 +351,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary /\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d / _%d;\n", left, right)
 			return id
@@ -273,6 +364,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary ==\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d == _%d;\n", left, right)
 			return id
@@ -280,6 +377,12 @@ EmitExpression_C :: proc(
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// binary !=\n")
 			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.operator_token.line,
+				expression.operator_token.filepath,
+			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d != _%d;\n", left, right)
 			return id
@@ -298,10 +401,22 @@ EmitExpression_C :: proc(
 		for id, i in ids {
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// argument %d\n", i + 1)
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.open_parenthesis_token.line,
+				expression.open_parenthesis_token.filepath,
+			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "sp -= sizeof(")
 			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
 			fmt.sbprintf(buffer, ");\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.open_parenthesis_token.line,
+				expression.open_parenthesis_token.filepath,
+			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "*(")
 			EmitType_C(GetPointerType(GetType(expression.arguments[i])), "", 0, buffer)
@@ -310,12 +425,36 @@ EmitExpression_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// return location\n")
 		ret_id := GetID()
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.open_parenthesis_token.line,
+			expression.open_parenthesis_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "sp -= sizeof(void*);\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.open_parenthesis_token.line,
+			expression.open_parenthesis_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "*(void**)sp = &&_%d;\n", ret_id)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.open_parenthesis_token.line,
+			expression.open_parenthesis_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "goto *_%d;\n", operand)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.open_parenthesis_token.line,
+			expression.open_parenthesis_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "_%d:\n", ret_id)
 		id := GetID()
@@ -323,10 +462,22 @@ EmitExpression_C :: proc(
 		if _, ok := return_type.(^TypeVoid); !ok {
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "// return value\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.open_parenthesis_token.line,
+				expression.open_parenthesis_token.filepath,
+			)
 			EmitType_C(return_type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = *(")
 			EmitType_C(GetPointerType(return_type), "", 0, buffer)
 			fmt.sbprintf(buffer, ")sp;\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.open_parenthesis_token.line,
+				expression.open_parenthesis_token.filepath,
+			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "sp += sizeof(")
 			EmitType_C(return_type, "", 0, buffer)
@@ -334,9 +485,21 @@ EmitExpression_C :: proc(
 		}
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// call cleanup\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.close_parenthesis_token.line,
+			expression.close_parenthesis_token.filepath,
+		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "sp += sizeof(void*);\n")
 		for id, i in ids {
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.close_parenthesis_token.line,
+				expression.close_parenthesis_token.filepath,
+			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "sp += sizeof(")
 			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
@@ -352,6 +515,12 @@ EmitExpression_C :: proc(
 					id := GetID()
 					PrintIndent(indent, buffer)
 					fmt.sbprintf(buffer, "// get '%s'\n", name)
+					fmt.sbprintf(
+						buffer,
+						"#line %d \"%s\"\n",
+						expression.name_token.line,
+						expression.name_token.filepath,
+					)
 					EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 					fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
 					return id
@@ -361,6 +530,12 @@ EmitExpression_C :: proc(
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "// get 'print_int'\n")
 						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "void* _%d = &&_print_int;\n", id)
 						return id
@@ -368,6 +543,12 @@ EmitExpression_C :: proc(
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "// get 'print_bool'\n")
 						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "void* _%d = &&_print_bool;\n", id)
 						return id
@@ -375,6 +556,12 @@ EmitExpression_C :: proc(
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "// get 'print_ln'\n")
 						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
 						PrintIndent(indent, buffer)
 						fmt.sbprintf(buffer, "void* _%d = &&_println;\n", id)
 						return id
@@ -392,6 +579,12 @@ EmitExpression_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "// integer %d\n", value)
 		id := GetID()
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.integer_token.line,
+			expression.integer_token.filepath,
+		)
 		EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = %d;\n", value)
 		return id
