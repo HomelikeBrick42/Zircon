@@ -30,6 +30,8 @@ TokenKind :: enum {
 	// Symbols
 	OpenParenthesis,
 	CloseParenthesis,
+	OpenBrace,
+	CloseBrace,
 	Colon,
 	Comma,
 	Equal,
@@ -44,10 +46,16 @@ TokenKind :: enum {
 	ExclamationMarkEqual,
 
 	// Keywords
+	If,
+	Else,
 }
 
 TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
 	switch name {
+	case "if":
+		return .If
+	case "else":
+		return .Else
 	case:
 		return nil
 	}
@@ -63,6 +71,10 @@ TokenKind_GetCharKind :: proc(chr: rune) -> Maybe(TokenKind) {
 		return .OpenParenthesis
 	case ')':
 		return .CloseParenthesis
+	case '{':
+		return .OpenBrace
+	case '}':
+		return .CloseBrace
 	case ':':
 		return .Colon
 	case ',':
@@ -111,6 +123,10 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "("
 	case .CloseParenthesis:
 		return ")"
+	case .OpenBrace:
+		return "{"
+	case .CloseBrace:
+		return "}"
 	case .Colon:
 		return ":"
 	case .Comma:
@@ -131,6 +147,10 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "!"
 	case .ExclamationMarkEqual:
 		return "!="
+	case .If:
+		return "if"
+	case .Else:
+		return "else"
 	}
 	return "{invalid}"
 }
@@ -150,7 +170,7 @@ TokenData :: union {
 Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	switch token.kind {
-	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual:
+	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .If, .Else:
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))

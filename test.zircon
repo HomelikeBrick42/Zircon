@@ -2,9 +2,9 @@ a := 42
 a = a + 5 * -10
 num_characters := print_int(a)
 println()
-print_int(num_characters)
-println()
-print_bool(a == -8)
-println()
-print_bool(num_characters == 5)
+if -a == 8 {
+    print_int(10)
+} else {
+    print_int(5)
+}
 println()

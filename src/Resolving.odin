@@ -41,7 +41,12 @@ ResolveStatement :: proc(
 ) -> Maybe(Error) {
 	switch statement in statement {
 	case ^AstScope:
-		unimplemented()
+		append(names, Scope{})
+		for statement in statement.statements {
+			ResolveAst(statement, names) or_return
+		}
+		delete(pop(names))
+		return nil
 	case ^AstDeclaration:
 		ResolveExpression(statement.value, names) or_return
 		statement.resolved_type = GetType(statement.value)
@@ -76,7 +81,17 @@ ResolveStatement :: proc(
 		}
 		return nil
 	case ^AstIf:
-		unimplemented()
+		ResolveExpression(statement.condition, names) or_return
+		ExpectType(
+			GetType(statement.condition),
+			&BoolType,
+			statement.if_token.location,
+		) or_return
+		ResolveStatement(statement.then_body, names) or_return
+		if else_body, ok := statement.else_body.?; ok {
+			ResolveStatement(else_body, names) or_return
+		}
+		return nil
 	case AstExpression:
 		return ResolveExpression(statement, names)
 	case:

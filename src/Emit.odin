@@ -106,7 +106,15 @@ EmitStatement_C :: proc(
 ) {
 	switch statement in statement {
 	case ^AstScope:
-		unimplemented()
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// scope\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "{{\n")
+		for statement in statement.statements {
+			EmitStatement_C(statement, names, indent + 1, buffer)
+		}
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "}}\n")
 	case ^AstDeclaration:
 		value := EmitExpression_C(statement.value, names, indent, buffer)
 		name := statement.name_token.data.(string)
@@ -124,11 +132,21 @@ EmitStatement_C :: proc(
 		operand := EmitAddressOf_C(statement.operand, names, indent, buffer)
 		value := EmitExpression_C(statement.value, names, indent, buffer)
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, " // assignment\n")
+		fmt.sbprintf(buffer, "// assignment\n")
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "*_%d = _%d;\n", operand, value)
 	case ^AstIf:
-		unimplemented()
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// if\n")
+		condition := EmitExpression_C(statement.condition, names, indent, buffer)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "if (_%d)\n", condition)
+		EmitStatement_C(statement.then_body, names, indent, buffer)
+		if else_body, ok := statement.else_body.?; ok {
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "else\n")
+			EmitStatement_C(else_body, names, indent, buffer)
+		}
 	case AstExpression:
 		EmitExpression_C(statement, names, indent, buffer)
 	case:

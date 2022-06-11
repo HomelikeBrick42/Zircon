@@ -18,8 +18,38 @@ ParseFile :: proc(filepath, source: string) -> (ast: ^AstFile, error: Maybe(Erro
 	return file, nil
 }
 
+ParseScope :: proc(lexer: ^Lexer) -> (ast: ^AstScope, error: Maybe(Error)) {
+	scope := new(AstScope)
+	scope.open_brace_token = Lexer_ExpectToken(lexer, .OpenBrace) or_return
+	for {
+		AllowMultipleNewlines(lexer)
+		if Lexer_CurrentToken(lexer^) or_return.kind == .CloseBrace do break
+		append(&scope.statements, ParseStatement(lexer) or_return)
+		Lexer_ExpectToken(lexer, .Newline) or_return
+		if Lexer_CurrentToken(lexer^) or_return.kind == .CloseBrace do break
+	}
+	scope.close_brace_token = Lexer_ExpectToken(lexer, .CloseBrace) or_return
+	return scope, nil
+}
+
+ParseIf :: proc(lexer: ^Lexer) -> (ast: ^AstIf, error: Maybe(Error)) {
+	if_ := new(AstIf)
+	if_.if_token = Lexer_ExpectToken(lexer, .If) or_return
+	if_.condition = ParseExpression(lexer) or_return
+	if_.then_body = ParseScope(lexer) or_return
+	if Lexer_CurrentToken(lexer^) or_return.kind == .Else {
+		if_.else_token = Lexer_ExpectToken(lexer, .Else) or_return
+		if_.else_body = ParseScope(lexer) or_return
+	}
+	return if_, nil
+}
+
 ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)) {
 	#partial switch Lexer_CurrentToken(lexer^) or_return.kind {
+	case .OpenBrace:
+		return ParseScope(lexer)
+	case .If:
+		return ParseIf(lexer)
 	case .Name:
 		copy := lexer^
 		name_token := Lexer_ExpectToken(lexer, .Name) or_return
@@ -149,7 +179,7 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 			binary_precedence, kind := GetBinaryPrecedence(
 				Lexer_CurrentToken(lexer^) or_return.kind,
 			)
-			if kind == .Invalid do break loop
+			if kind == .Invalid || binary_precedence <= parent_precedence do break loop
 
 			binary := new(AstBinary)
 			binary.left = left
