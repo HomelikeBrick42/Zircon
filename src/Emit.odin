@@ -239,6 +239,7 @@ EmitExpression_C :: proc(
 	case ^AstCall:
 		operand := EmitExpression_C(expression.operand, names, file)
 		ids: [dynamic]uint
+		defer delete(ids)
 		for argument in expression.arguments {
 			append(&ids, EmitExpression_C(argument, names, file))
 		}
