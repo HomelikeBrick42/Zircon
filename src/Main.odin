@@ -116,7 +116,7 @@ main :: proc() {
 			os.exit(1)
 		}
 		defer os.close(file)
-		EmitAst_C(ast, &names, os.stdout)
+		EmitAst_C(ast, &names, file)
 	case:
 		fmt.eprintf("Unknown command '%s'\n", command)
 		os.exit(1)
