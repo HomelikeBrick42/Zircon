@@ -110,7 +110,7 @@ main :: proc() {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
-		file, err := os.open("output.c", os.O_WRONLY | os.O_CREATE)
+		file, err := os.open("output.c", os.O_WRONLY | os.O_CREATE | os.O_TRUNC)
 		if err != 0 {
 			fmt.eprintln("Failed to open 'output.c'\n")
 			os.exit(1)

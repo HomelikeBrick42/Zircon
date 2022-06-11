@@ -1,4 +1,6 @@
 a := 42
 a = a + 5 * -10
-print_int(a)
+num_characters := print_int(a)
+println()
+print_int(num_characters)
 println()

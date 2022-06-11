@@ -206,14 +206,14 @@ ResolveExpression :: proc(
 					case .PrintInt:
 						for procedure_type in ProcedureTypes {
 							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
-							   &IntType && procedure_type.return_type == &VoidType {
+							   &IntType && procedure_type.return_type == &IntType {
 								expression.type = procedure_type
 								return nil
 							}
 						}
 						type := new(TypeProcedure)
 						append(&type.parameter_types, &IntType)
-						type.return_type = &VoidType
+						type.return_type = &IntType
 						append(&ProcedureTypes, type)
 						expression.type = type
 						return nil

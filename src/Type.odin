@@ -6,6 +6,7 @@ Type :: union #shared_nil {
 	^TypeVoid,
 	^TypeInt,
 	^TypeBool,
+	^TypePointer,
 	^TypeProcedure,
 }
 
@@ -14,6 +15,10 @@ TypeVoid :: struct {}
 TypeInt :: struct {}
 
 TypeBool :: struct {}
+
+TypePointer :: struct {
+	pointer_to: Type,
+}
 
 TypeProcedure :: struct {
 	parameter_types: [dynamic]Type,
@@ -37,6 +42,12 @@ DumpType :: proc(type: Type, indent: uint) {
 	case ^TypeBool:
 		PrintIndent(indent)
 		fmt.println("- Bool Type")
+	case ^TypePointer:
+		PrintIndent(indent)
+		fmt.println("- Pointer Type")
+		PrintIndent(indent + 1)
+		fmt.println("Pointer To:")
+		DumpType(type.pointer_to, indent + 2)
 	case ^TypeProcedure:
 		PrintIndent(indent)
 		fmt.println("- Procedure Type")
@@ -56,4 +67,15 @@ DumpType :: proc(type: Type, indent: uint) {
 VoidType := TypeVoid{}
 IntType := TypeInt{}
 BoolType := TypeBool{}
+PointerTypes := make(map[Type]TypePointer)
 ProcedureTypes := make([dynamic]^TypeProcedure)
+
+GetPointerType :: proc(pointer_to: Type) -> Type {
+	if type, ok := &PointerTypes[pointer_to]; ok {
+		return type
+	}
+	PointerTypes[pointer_to] = TypePointer {
+		pointer_to = pointer_to,
+	}
+	return &PointerTypes[pointer_to]
+}

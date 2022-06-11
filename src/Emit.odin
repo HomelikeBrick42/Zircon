@@ -11,12 +11,34 @@ GetID :: proc() -> uint {
 	return new_id
 }
 
+EmitType_C :: proc(type: Type, name: string, file: os.Handle) {
+	switch type in type {
+	case ^TypeVoid:
+		fmt.fprintf(file, "void %s", name)
+	case ^TypeInt:
+		fmt.fprintf(file, "int %s", name)
+	case ^TypeBool:
+		fmt.fprintf(file, "bool %s", name)
+	case ^TypePointer:
+		if name != "" {
+			EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), file)
+		} else {
+			EmitType_C(type.pointer_to, "*", file)
+		}
+	case ^TypeProcedure:
+		fmt.fprintf(file, "void* %s", name)
+	case:
+		unreachable()
+	}
+}
+
 EmitAst_C :: proc(ast: Ast, names: ^[dynamic]Scope, file: os.Handle) {
 	switch ast in ast {
 	case ^AstFile:
 		fmt.fprintf(
 			file,
 			`#include <stdio.h>
+#include <stdbool.h>
 
 static char stack[1024 * 1024];
 static char* sp = stack + (1024 * 1024);
@@ -26,7 +48,9 @@ int main() {{
     _print_int: {{
         void* retAddress = *(void**)sp;
         int value = *(int*)(sp + sizeof(void*));
-        printf("%%d", value);
+        int numCharacters = printf("%%d", value);
+        sp -= sizeof(int);
+        *(int*)sp = numCharacters;
         goto *retAddress;
     }}
     _println: {{
@@ -61,7 +85,9 @@ EmitStatement_C :: proc(
 	switch statement in statement {
 	case ^AstDeclaration:
 		value := EmitExpression_C(statement.value, names, file)
-		fmt.fprintf(file, "        int _%d = _%d;\n", uintptr(statement), value)
+		fmt.fprintf(file, "        ")
+		EmitType_C(statement.resolved_type, fmt.tprintf("_%d", uintptr(statement)), file)
+		fmt.fprintf(file, " = _%d;\n", value)
 		name := statement.name_token.data.(string)
 		names[len(names) - 1][name] = statement
 	case ^AstAssignment:
@@ -94,7 +120,9 @@ EmitAddressOf_C :: proc(
 				switch decl in decl {
 				case ^AstDeclaration:
 					id := GetID()
-					fmt.fprintf(file, "        int* _%d = &_%d;\n", id, uintptr(decl))
+					fmt.fprintf(file, "        ")
+					EmitType_C(GetPointerType(decl.resolved_type), fmt.tprintf("_%d", id), file)
+					fmt.fprintf(file, " = &_%d;\n", uintptr(decl))
 					return id
 				case Builtin:
 					unreachable()
@@ -124,11 +152,15 @@ EmitExpression_C :: proc(
 			unreachable()
 		case .Identity:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = +_%d;\n", id, operand)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = +_%d;\n", operand)
 			return id
 		case .Negation:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = -_%d;\n", id, operand)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = -_%d;\n", operand)
 			return id
 		case .LogicalNot:
 			unimplemented()
@@ -143,19 +175,27 @@ EmitExpression_C :: proc(
 			unreachable()
 		case .Addition:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = _%d + _%d;\n", id, left, right)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, "  = _%d + _%d;\n", left, right)
 			return id
 		case .Subtraction:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = _%d - _%d;\n", id, left, right)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = _%d - _%d;\n", left, right)
 			return id
 		case .Multiplication:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = _%d * _%d;\n", id, left, right)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = _%d * _%d;\n", left, right)
 			return id
 		case .Division:
 			id := GetID()
-			fmt.fprintf(file, "        int _%d = _%d / _%d;\n", id, left, right)
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = _%d / _%d;\n", left, right)
 			return id
 		case .Equal:
 			unimplemented()
@@ -170,21 +210,38 @@ EmitExpression_C :: proc(
 		for argument in expression.arguments {
 			append(&ids, EmitExpression_C(argument, names, file))
 		}
-		for id in ids {
-			fmt.fprintf(file, "        sp -= sizeof(int);\n")
-			fmt.fprintf(file, "        *(int*)sp = _%d;\n", id)
+		for id, i in ids {
+			fmt.fprintf(file, "        sp -= sizeof(")
+			EmitType_C(GetType(expression.arguments[i]), "", file)
+			fmt.fprintf(file, ");\n")
+			fmt.fprint(file, "        *(")
+			EmitType_C(GetPointerType(GetType(expression.arguments[i])), "", file)
+			fmt.fprintf(file, ")sp = _%d;\n", id)
 		}
 		ret_id := GetID()
 		fmt.fprintf(file, "        sp -= sizeof(void*);\n")
 		fmt.fprintf(file, "        *(void**)sp = &&_%d;\n", ret_id)
 		fmt.fprintf(file, "        goto *_%d;\n", operand)
 		fmt.fprintf(file, "        _%d:\n", ret_id)
-		fmt.fprintf(file, "        sp += sizeof(void*);\n")
-		for id in ids {
-			fmt.fprintf(file, "        sp += sizeof(int);\n")
+		id := GetID()
+		return_type := GetType(expression.operand).(^TypeProcedure).return_type
+		if _, ok := return_type.(^TypeVoid); !ok {
+			fmt.fprintf(file, "        ")
+			EmitType_C(return_type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = *(")
+			EmitType_C(GetPointerType(return_type), "", file)
+			fmt.fprintf(file, ")sp;\n")
+			fmt.fprintf(file, "        sp += sizeof(")
+			EmitType_C(return_type, "", file)
+			fmt.fprintf(file, ");\n")
 		}
-		// TODO: save result to a variable
-		return 0
+		fmt.fprintf(file, "        sp += sizeof(void*);\n")
+		for id, i in ids {
+			fmt.fprintf(file, "        sp += sizeof(")
+			EmitType_C(GetType(expression.arguments[i]), "", file)
+			fmt.fprintf(file, ");\n")
+		}
+		return id
 	case ^AstName:
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
@@ -192,7 +249,9 @@ EmitExpression_C :: proc(
 				switch decl in decl {
 				case ^AstDeclaration:
 					id := GetID()
-					fmt.fprintf(file, "        int _%d = _%d;\n", id, uintptr(decl))
+					fmt.fprintf(file, "        ")
+					EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+					fmt.fprintf(file, " = _%d;\n", uintptr(decl))
 					return id
 				case Builtin:
 					switch decl {
@@ -215,7 +274,9 @@ EmitExpression_C :: proc(
 		unreachable()
 	case ^AstInteger:
 		id := GetID()
-		fmt.fprintf(file, "        int _%d = %d;\n", id, expression.integer_token.data.(u128))
+		fmt.fprintf(file, "        ")
+		EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+		fmt.fprintf(file, " = %d;\n", expression.integer_token.data.(u128))
 		return id
 	case:
 		unreachable()
