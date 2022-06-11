@@ -261,7 +261,7 @@ EmitExpression_C :: proc(
 		id := GetID()
 		return_type := GetType(expression.operand).(^TypeProcedure).return_type
 		if _, ok := return_type.(^TypeVoid); !ok {
-			fmt.fprintf(file, "        // Return Value\n")
+			fmt.fprintf(file, "        // return value\n")
 			fmt.fprintf(file, "        ")
 			EmitType_C(return_type, fmt.tprintf("_%d", id), file)
 			fmt.fprintf(file, " = *(")
