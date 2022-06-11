@@ -53,6 +53,14 @@ int main() {{
         *(int*)sp = numCharacters;
         goto *retAddress;
     }}
+    _print_bool: {{
+        void* retAddress = *(void**)sp;
+        bool value = *(bool*)(sp + sizeof(void*));
+        int numCharacters = printf(value ? "true" : "false");
+        sp -= sizeof(int);
+        *(int*)sp = numCharacters;
+        goto *retAddress;
+    }}
     _println: {{
         void* retAddress = *(void**)sp;
         printf("\n");
@@ -163,7 +171,11 @@ EmitExpression_C :: proc(
 			fmt.fprintf(file, " = -_%d;\n", operand)
 			return id
 		case .LogicalNot:
-			unimplemented()
+			id := GetID()
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = !_%d;\n", operand)
+			return id
 		case:
 			unreachable()
 		}
@@ -198,9 +210,17 @@ EmitExpression_C :: proc(
 			fmt.fprintf(file, " = _%d / _%d;\n", left, right)
 			return id
 		case .Equal:
-			unimplemented()
+			id := GetID()
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = _%d == _%d;\n", left, right)
+			return id
 		case .NotEqual:
-			unimplemented()
+			id := GetID()
+			fmt.fprintf(file, "        ")
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), file)
+			fmt.fprintf(file, " = _%d != _%d;\n", left, right)
+			return id
 		case:
 			unreachable()
 		}
@@ -258,6 +278,10 @@ EmitExpression_C :: proc(
 					case .PrintInt:
 						id := GetID()
 						fmt.fprintf(file, "        void* _%d = &&_print_int;\n", id)
+						return id
+					case .PrintBool:
+						id := GetID()
+						fmt.fprintf(file, "        void* _%d = &&_print_bool;\n", id)
 						return id
 					case .Println:
 						id := GetID()

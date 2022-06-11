@@ -4,6 +4,7 @@ import "core:fmt"
 
 Builtin :: enum {
 	PrintInt,
+	PrintBool,
 	Println,
 }
 
@@ -112,6 +113,17 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]map[string]Va
 			}
 			value := EvalExpression(expression.arguments[0], names) or_return
 			fmt.print(value.(int))
+			return nil, nil
+		case .PrintBool:
+			if len(expression.arguments) != 1 {
+				error = Error {
+					location = expression.open_parenthesis_token.location,
+					message  = fmt.aprintf("'print_bool' expects 1 argument"),
+				}
+				return nil, error
+			}
+			value := EvalExpression(expression.arguments[0], names) or_return
+			fmt.print(value.(bool))
 			return nil, nil
 		case .Println:
 			if len(expression.arguments) != 0 {

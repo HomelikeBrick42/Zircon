@@ -154,7 +154,7 @@ ResolveExpression :: proc(
 				GetType(expression.right),
 				expression.operator_token.location,
 			) or_return
-			expression.type = GetType(expression.left)
+			expression.type = &BoolType
 			return nil
 		case .NotEqual:
 			ExpectType(
@@ -162,7 +162,7 @@ ResolveExpression :: proc(
 				GetType(expression.right),
 				expression.operator_token.location,
 			) or_return
-			expression.type = GetType(expression.left)
+			expression.type = &BoolType
 			return nil
 		case:
 			unreachable()
@@ -213,6 +213,20 @@ ResolveExpression :: proc(
 						}
 						type := new(TypeProcedure)
 						append(&type.parameter_types, &IntType)
+						type.return_type = &IntType
+						append(&ProcedureTypes, type)
+						expression.type = type
+						return nil
+					case .PrintBool:
+						for procedure_type in ProcedureTypes {
+							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
+							   &BoolType && procedure_type.return_type == &IntType {
+								expression.type = procedure_type
+								return nil
+							}
+						}
+						type := new(TypeProcedure)
+						append(&type.parameter_types, &BoolType)
 						type.return_type = &IntType
 						append(&ProcedureTypes, type)
 						expression.type = type

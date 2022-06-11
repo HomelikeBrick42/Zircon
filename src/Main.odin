@@ -84,7 +84,11 @@ main :: proc() {
 		}
 		append(
 			&names,
-			map[string]Value{"print_int" = Builtin.PrintInt, "println" = Builtin.Println},
+			map[string]Value{
+				"print_int" = Builtin.PrintInt,
+				"print_bool" = Builtin.PrintBool,
+				"println" = Builtin.Println,
+			},
 		)
 		error = EvalAst(ast, &names)
 		if error, ok := error.?; ok {
@@ -104,7 +108,14 @@ main :: proc() {
 			}
 			delete(names)
 		}
-		append(&names, Scope{"print_int" = Builtin.PrintInt, "println" = Builtin.Println})
+		append(
+			&names,
+			Scope{
+				"print_int" = Builtin.PrintInt,
+				"print_bool" = Builtin.PrintBool,
+				"println" = Builtin.Println,
+			},
+		)
 		error = ResolveAst(ast, &names)
 		if error, ok := error.?; ok {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
