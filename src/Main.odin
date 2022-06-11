@@ -15,6 +15,7 @@ main :: proc() {
 		fmt.eprintf("    show_ast    - prints the ast\n")
 		fmt.eprintf("    check_ast   - type checks the ast\n")
 		fmt.eprintf("    run         - executes the file\n")
+		fmt.eprintf("    emit_c      - emits C code\n")
 		os.exit(1)
 	}
 
@@ -90,6 +91,32 @@ main :: proc() {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
+	case "emit_c":
+		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		names: [dynamic]Scope
+		defer {
+			for scope in names {
+				delete(scope)
+			}
+			delete(names)
+		}
+		append(&names, Scope{"print_int" = Builtin.PrintInt, "println" = Builtin.Println})
+		error = ResolveAst(ast, &names)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+		file, err := os.open("output.c", os.O_WRONLY | os.O_CREATE)
+		if err != 0 {
+			fmt.eprintln("Failed to open 'output.c'\n")
+			os.exit(1)
+		}
+		defer os.close(file)
+		EmitAst_C(ast, &names, os.stdout)
 	case:
 		fmt.eprintf("Unknown command '%s'\n", command)
 		os.exit(1)
