@@ -125,7 +125,7 @@ main :: proc() {
 
 		buffer := strings.make_builder()
 		defer strings.destroy_builder(&buffer)
-		EmitAst_C(ast, &names, &buffer)
+		EmitAst_C(ast, &names, 0, &buffer)
 
 		if !os.write_entire_file("output.c", transmute([]byte)strings.to_string(buffer)) {
 			fmt.eprintln("Failed to open 'output.c'\n")

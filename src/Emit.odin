@@ -12,28 +12,40 @@ GetID :: proc() -> uint {
 	return new_id
 }
 
-EmitType_C :: proc(type: Type, name: string, buffer: ^strings.Builder) {
+@(private = "file")
+PrintIndent :: proc(indent: uint, buffer: ^strings.Builder) {
+	for _ in 0 ..< indent {
+		fmt.sbprint(buffer, "    ")
+	}
+}
+
+EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Builder) {
 	switch type in type {
 	case ^TypeVoid:
+		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "void %s", name)
 	case ^TypeInt:
+		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "int %s", name)
 	case ^TypeBool:
+		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "bool %s", name)
 	case ^TypePointer:
-		if name != "" {
-			EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), buffer)
-		} else {
-			EmitType_C(type.pointer_to, "*", buffer)
-		}
+		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
 	case ^TypeProcedure:
+		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "void* %s", name)
 	case:
 		unreachable()
 	}
 }
 
-EmitAst_C :: proc(ast: Ast, names: ^[dynamic]Scope, buffer: ^strings.Builder) {
+EmitAst_C :: proc(
+	ast: Ast,
+	names: ^[dynamic]Scope,
+	indent: uint,
+	buffer: ^strings.Builder,
+) {
 	switch ast in ast {
 	case ^AstFile:
 		fmt.sbprintf(
@@ -72,7 +84,7 @@ int main() {{
 		)
 		append(names, Scope{})
 		for statement in ast.statements {
-			EmitStatement_C(statement, names, buffer)
+			EmitStatement_C(statement, names, indent + 2, buffer)
 		}
 		delete(pop(names))
 		fmt.sbprintf(buffer, `        return 0;
@@ -80,7 +92,7 @@ int main() {{
 }}
 `)
 	case AstStatement:
-		EmitStatement_C(ast, names, buffer)
+		EmitStatement_C(ast, names, indent, buffer)
 	case:
 		unreachable()
 	}
@@ -89,28 +101,36 @@ int main() {{
 EmitStatement_C :: proc(
 	statement: AstStatement,
 	names: ^[dynamic]Scope,
+	indent: uint,
 	buffer: ^strings.Builder,
 ) {
 	switch statement in statement {
 	case ^AstScope:
 		unimplemented()
 	case ^AstDeclaration:
-		value := EmitExpression_C(statement.value, names, buffer)
+		value := EmitExpression_C(statement.value, names, indent, buffer)
 		name := statement.name_token.data.(string)
-		fmt.sbprintf(buffer, "        // declaration of '%s'\n", name)
-		fmt.sbprintf(buffer, "        ")
-		EmitType_C(statement.resolved_type, fmt.tprintf("_%d", uintptr(statement)), buffer)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// declaration of '%s'\n", name)
+		EmitType_C(
+			statement.resolved_type,
+			fmt.tprintf("_%d", uintptr(statement)),
+			indent,
+			buffer,
+		)
 		fmt.sbprintf(buffer, " = _%d;\n", value)
 		names[len(names) - 1][name] = statement
 	case ^AstAssignment:
-		operand := EmitAddressOf_C(statement.operand, names, buffer)
-		value := EmitExpression_C(statement.value, names, buffer)
-		fmt.sbprintf(buffer, "        // assignment\n")
-		fmt.sbprintf(buffer, "        *_%d = _%d;\n", operand, value)
+		operand := EmitAddressOf_C(statement.operand, names, indent, buffer)
+		value := EmitExpression_C(statement.value, names, indent, buffer)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, " // assignment\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "*_%d = _%d;\n", operand, value)
 	case ^AstIf:
 		unimplemented()
 	case AstExpression:
-		EmitExpression_C(statement, names, buffer)
+		EmitExpression_C(statement, names, indent, buffer)
 	case:
 		unreachable()
 	}
@@ -119,6 +139,7 @@ EmitStatement_C :: proc(
 EmitAddressOf_C :: proc(
 	expression: AstExpression,
 	names: ^[dynamic]Scope,
+	indent: uint,
 	buffer: ^strings.Builder,
 ) -> uint {
 	switch expression in expression {
@@ -134,10 +155,15 @@ EmitAddressOf_C :: proc(
 			if decl, ok := names[i][name]; ok {
 				switch decl in decl {
 				case ^AstDeclaration:
-					fmt.sbprintf(buffer, "        // get address of '%s'\n", name)
+					PrintIndent(indent, buffer)
+					fmt.sbprintf(buffer, "// get address of '%s'\n", name)
 					id := GetID()
-					fmt.sbprintf(buffer, "        ")
-					EmitType_C(GetPointerType(decl.resolved_type), fmt.tprintf("_%d", id), buffer)
+					EmitType_C(
+						GetPointerType(decl.resolved_type),
+						fmt.tprintf("_%d", id),
+						indent,
+						buffer,
+					)
 					fmt.sbprintf(buffer, " = &_%d;\n", uintptr(decl))
 					return id
 				case Builtin:
@@ -158,130 +184,144 @@ EmitAddressOf_C :: proc(
 EmitExpression_C :: proc(
 	expression: AstExpression,
 	names: ^[dynamic]Scope,
+	indent: uint,
 	buffer: ^strings.Builder,
 ) -> uint {
 	switch expression in expression {
 	case ^AstUnary:
-		operand := EmitExpression_C(expression.operand, names, buffer)
+		operand := EmitExpression_C(expression.operand, names, indent, buffer)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Identity:
-			fmt.sbprintf(buffer, "        // unary +\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// unary +\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = +_%d;\n", operand)
 			return id
 		case .Negation:
-			fmt.sbprintf(buffer, "        // unary -\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// unary -\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = -_%d;\n", operand)
 			return id
 		case .LogicalNot:
-			fmt.sbprintf(buffer, "        // unary !\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// unary !\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = !_%d;\n", operand)
 			return id
 		case:
 			unreachable()
 		}
 	case ^AstBinary:
-		left := EmitExpression_C(expression.left, names, buffer)
-		right := EmitExpression_C(expression.right, names, buffer)
+		left := EmitExpression_C(expression.left, names, indent, buffer)
+		right := EmitExpression_C(expression.right, names, indent, buffer)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Addition:
-			fmt.sbprintf(buffer, "        // binary +\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary +\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, "  = _%d + _%d;\n", left, right)
 			return id
 		case .Subtraction:
-			fmt.sbprintf(buffer, "        // binary -\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary -\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d - _%d;\n", left, right)
 			return id
 		case .Multiplication:
-			fmt.sbprintf(buffer, "        // binary *\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary *\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d * _%d;\n", left, right)
 			return id
 		case .Division:
-			fmt.sbprintf(buffer, "        // binary /\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary /\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d / _%d;\n", left, right)
 			return id
 		case .Equal:
-			fmt.sbprintf(buffer, "        // binary ==\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary ==\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d == _%d;\n", left, right)
 			return id
 		case .NotEqual:
-			fmt.sbprintf(buffer, "        // binary !=\n")
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// binary !=\n")
 			id := GetID()
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d != _%d;\n", left, right)
 			return id
 		case:
 			unreachable()
 		}
 	case ^AstCall:
-		operand := EmitExpression_C(expression.operand, names, buffer)
+		operand := EmitExpression_C(expression.operand, names, indent, buffer)
 		ids: [dynamic]uint
 		defer delete(ids)
 		for argument in expression.arguments {
-			append(&ids, EmitExpression_C(argument, names, buffer))
+			append(&ids, EmitExpression_C(argument, names, indent, buffer))
 		}
-		fmt.sbprintf(buffer, "        // call\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// call\n")
 		for id, i in ids {
-			fmt.sbprintf(buffer, "        // argument %d\n", i + 1)
-			fmt.sbprintf(buffer, "        sp -= sizeof(")
-			EmitType_C(GetType(expression.arguments[i]), "", buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// argument %d\n", i + 1)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "sp -= sizeof(")
+			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
 			fmt.sbprintf(buffer, ");\n")
-			fmt.sbprintf(buffer, "        *(")
-			EmitType_C(GetPointerType(GetType(expression.arguments[i])), "", buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "*(")
+			EmitType_C(GetPointerType(GetType(expression.arguments[i])), "", 0, buffer)
 			fmt.sbprintf(buffer, ")sp = _%d;\n", id)
 		}
-		fmt.sbprintf(buffer, "        // return location\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// return location\n")
 		ret_id := GetID()
-		fmt.sbprintf(buffer, "        sp -= sizeof(void*);\n")
-		fmt.sbprintf(buffer, "        *(void**)sp = &&_%d;\n", ret_id)
-		fmt.sbprintf(buffer, "        goto *_%d;\n", operand)
-		fmt.sbprintf(buffer, "        _%d:\n", ret_id)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "sp -= sizeof(void*);\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "*(void**)sp = &&_%d;\n", ret_id)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "goto *_%d;\n", operand)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "_%d:\n", ret_id)
 		id := GetID()
 		return_type := GetType(expression.operand).(^TypeProcedure).return_type
 		if _, ok := return_type.(^TypeVoid); !ok {
-			fmt.sbprintf(buffer, "        // return value\n")
-			fmt.sbprintf(buffer, "        ")
-			EmitType_C(return_type, fmt.tprintf("_%d", id), buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "// return value\n")
+			EmitType_C(return_type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = *(")
-			EmitType_C(GetPointerType(return_type), "", buffer)
+			EmitType_C(GetPointerType(return_type), "", 0, buffer)
 			fmt.sbprintf(buffer, ")sp;\n")
-			fmt.sbprintf(buffer, "        sp += sizeof(")
-			EmitType_C(return_type, "", buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "sp += sizeof(")
+			EmitType_C(return_type, "", 0, buffer)
 			fmt.sbprintf(buffer, ");\n")
 		}
-		fmt.sbprintf(buffer, "        // call cleanup\n")
-		fmt.sbprintf(buffer, "        sp += sizeof(void*);\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// call cleanup\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "sp += sizeof(void*);\n")
 		for id, i in ids {
-			fmt.sbprintf(buffer, "        sp += sizeof(")
-			EmitType_C(GetType(expression.arguments[i]), "", buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "sp += sizeof(")
+			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
 			fmt.sbprintf(buffer, ");\n")
 		}
 		return id
@@ -292,27 +332,33 @@ EmitExpression_C :: proc(
 				switch decl in decl {
 				case ^AstDeclaration:
 					id := GetID()
-					fmt.sbprintf(buffer, "        // get '%s'\n", name)
-					fmt.sbprintf(buffer, "        ")
-					EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+					PrintIndent(indent, buffer)
+					fmt.sbprintf(buffer, "// get '%s'\n", name)
+					EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 					fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
 					return id
 				case Builtin:
 					switch decl {
 					case .PrintInt:
-						fmt.sbprintf(buffer, "        // get 'print_int'\n")
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "// get 'print_int'\n")
 						id := GetID()
-						fmt.sbprintf(buffer, "        void* _%d = &&_print_int;\n", id)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "void* _%d = &&_print_int;\n", id)
 						return id
 					case .PrintBool:
-						fmt.sbprintf(buffer, "        // get 'print_bool'\n")
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "// get 'print_bool'\n")
 						id := GetID()
-						fmt.sbprintf(buffer, "        void* _%d = &&_print_bool;\n", id)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "void* _%d = &&_print_bool;\n", id)
 						return id
 					case .Println:
-						fmt.sbprintf(buffer, "        // get 'print_ln'\n")
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "// get 'print_ln'\n")
 						id := GetID()
-						fmt.sbprintf(buffer, "        void* _%d = &&_println;\n", id)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "void* _%d = &&_println;\n", id)
 						return id
 					case:
 						unreachable()
@@ -325,10 +371,10 @@ EmitExpression_C :: proc(
 		unreachable()
 	case ^AstInteger:
 		value := expression.integer_token.data.(u128)
-		fmt.sbprintf(buffer, "        // integer %d\n", value)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// integer %d\n", value)
 		id := GetID()
-		fmt.sbprintf(buffer, "        ")
-		EmitType_C(expression.type, fmt.tprintf("_%d", id), buffer)
+		EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = %d;\n", value)
 		return id
 	case:
