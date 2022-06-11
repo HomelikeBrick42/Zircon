@@ -8,8 +8,10 @@ Ast :: union #shared_nil {
 }
 
 AstStatement :: union #shared_nil {
+	^AstScope,
 	^AstDeclaration,
 	^AstAssignment,
+	^AstIf,
 	AstExpression,
 }
 
@@ -27,6 +29,12 @@ AstFile :: struct {
 	end_of_file_token: Token,
 }
 
+AstScope :: struct {
+	open_brace_token:  Token,
+	statements:        [dynamic]AstStatement,
+	close_brace_token: Token,
+}
+
 AstDeclaration :: struct {
 	resolved_type: Type,
 	name_token:    Token,
@@ -40,6 +48,14 @@ AstAssignment :: struct {
 	operand:     AstExpression,
 	equal_token: Token,
 	value:       AstExpression,
+}
+
+AstIf :: struct {
+	if_token:   Token,
+	condition:  AstExpression,
+	then_body:  ^AstScope,
+	else_token: Token,
+	else_body:  Maybe(^AstScope),
 }
 
 UnaryOperatorKind :: enum {
@@ -141,13 +157,24 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			nil,
 			indent,
 		)
-		PrintIndent(indent + 1)
-		fmt.println("Statements:")
-		for statement in ast.statements {
-			DumpAst(statement, indent + 2)
+		if len(ast.statements) > 0 {
+			PrintIndent(indent + 1)
+			fmt.println("Statements:")
+			for statement in ast.statements {
+				DumpAst(statement, indent + 2)
+			}
 		}
 	case AstStatement:
 		switch ast in ast {
+		case ^AstScope:
+			PrintHeader("Scope", ast.open_brace_token.location, nil, indent)
+			if len(ast.statements) > 0 {
+				PrintIndent(indent + 1)
+				fmt.println("Statements:")
+				for statement in ast.statements {
+					DumpAst(statement, indent + 2)
+				}
+			}
 		case ^AstDeclaration:
 			PrintHeader("Declaration", ast.name_token.location, nil, indent)
 			PrintIndent(indent + 1)
@@ -168,6 +195,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			PrintIndent(indent + 1)
 			fmt.println("Value:")
 			DumpAst(AstStatement(ast.value), indent + 2)
+		case ^AstIf:
+			unimplemented()
 		case AstExpression:
 			switch ast in ast {
 			case ^AstUnary:

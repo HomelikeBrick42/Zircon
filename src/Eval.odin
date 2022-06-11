@@ -35,6 +35,8 @@ EvalStatement :: proc(
 	names: ^[dynamic]map[string]Value,
 ) -> Maybe(Error) {
 	switch statement in statement {
+	case ^AstScope:
+		unimplemented()
 	case ^AstDeclaration:
 		value := EvalExpression(statement.value, names) or_return
 		name := statement.name_token.data.(string)
@@ -52,6 +54,8 @@ EvalStatement :: proc(
 		value := EvalExpression(statement.value, names) or_return
 		operand^ = value
 		return nil
+	case ^AstIf:
+		unimplemented()
 	case AstExpression:
 		_, error := EvalExpression(statement, names)
 		return error
@@ -94,9 +98,9 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]map[string]Va
 		case .Division:
 			return left.(int) / right.(int), nil
 		case .Equal:
-			return left.(int) == right.(int), nil
+			return left == right, nil
 		case .NotEqual:
-			return left.(int) != right.(int), nil
+			return left != right, nil
 		case:
 			unreachable()
 		}

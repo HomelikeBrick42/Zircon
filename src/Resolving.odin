@@ -40,6 +40,8 @@ ResolveStatement :: proc(
 	names: ^[dynamic]Scope,
 ) -> Maybe(Error) {
 	switch statement in statement {
+	case ^AstScope:
+		unimplemented()
 	case ^AstDeclaration:
 		ResolveExpression(statement.value, names) or_return
 		statement.resolved_type = GetType(statement.value)
@@ -73,6 +75,8 @@ ResolveStatement :: proc(
 			}
 		}
 		return nil
+	case ^AstIf:
+		unimplemented()
 	case AstExpression:
 		return ResolveExpression(statement, names)
 	case:

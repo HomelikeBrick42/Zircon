@@ -3,6 +3,7 @@ package zircon
 import "core:io"
 import "core:os"
 import "core:fmt"
+import "core:strings"
 
 main :: proc() {
 	SetupFormatters()
@@ -121,13 +122,15 @@ main :: proc() {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
-		file, err := os.open("output.c", os.O_WRONLY | os.O_CREATE | os.O_TRUNC)
-		if err != 0 {
+
+		buffer := strings.make_builder()
+		defer strings.destroy_builder(&buffer)
+		EmitAst_C(ast, &names, &buffer)
+
+		if !os.write_entire_file("output.c", transmute([]byte)strings.to_string(buffer)) {
 			fmt.eprintln("Failed to open 'output.c'\n")
 			os.exit(1)
 		}
-		defer os.close(file)
-		EmitAst_C(ast, &names, file)
 	case:
 		fmt.eprintf("Unknown command '%s'\n", command)
 		os.exit(1)
