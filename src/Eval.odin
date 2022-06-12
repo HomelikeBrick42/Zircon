@@ -155,7 +155,7 @@ EvalAddressOf :: proc(
 	case ^AstAddressOf:
 		unreachable()
 	case ^AstDereference:
-		return EvalAddressOf(expression.operand, names)
+		return EvalExpression(expression.operand, names).(^Value)
 	case ^AstName:
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
