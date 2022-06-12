@@ -84,7 +84,7 @@ ResolveStatement :: proc(
 		ResolveExpression(statement.condition, names) or_return
 		ExpectType(
 			GetType(statement.condition),
-			&BoolType,
+			&DefaultBoolType,
 			statement.if_token.location,
 		) or_return
 		ResolveStatement(statement.then_body, names) or_return
@@ -96,7 +96,7 @@ ResolveStatement :: proc(
 		ResolveExpression(statement.condition, names) or_return
 		ExpectType(
 			GetType(statement.condition),
-			&BoolType,
+			&DefaultBoolType,
 			statement.while_token.location,
 		) or_return
 		ResolveStatement(statement.body, names) or_return
@@ -140,15 +140,27 @@ ResolveExpression :: proc(
 		case .Invalid:
 			unreachable()
 		case .Identity:
-			ExpectType(GetType(expression.operand), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.operand),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.operand)
 			return nil
 		case .Negation:
-			ExpectType(GetType(expression.operand), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.operand),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.operand)
 			return nil
 		case .LogicalNot:
-			ExpectType(GetType(expression.operand), &BoolType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.operand),
+				&DefaultBoolType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.operand)
 			return nil
 		case:
@@ -161,23 +173,55 @@ ResolveExpression :: proc(
 		case .Invalid:
 			unreachable()
 		case .Addition:
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Subtraction:
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Multiplication:
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Division:
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
-			ExpectType(GetType(expression.left), &IntType, expression.operator_token) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
+			ExpectType(
+				GetType(expression.left),
+				&DefaultIntType,
+				expression.operator_token,
+			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Equal:
@@ -186,7 +230,7 @@ ResolveExpression :: proc(
 				GetType(expression.right),
 				expression.operator_token.location,
 			) or_return
-			expression.type = &BoolType
+			expression.type = &DefaultBoolType
 			return nil
 		case .NotEqual:
 			ExpectType(
@@ -194,7 +238,7 @@ ResolveExpression :: proc(
 				GetType(expression.right),
 				expression.operator_token.location,
 			) or_return
-			expression.type = &BoolType
+			expression.type = &DefaultBoolType
 			return nil
 		case:
 			unreachable()
@@ -253,43 +297,43 @@ ResolveExpression :: proc(
 				case Builtin:
 					switch decl {
 					case .PrintInt:
-						for procedure_type in ProcedureTypes {
+						for procedure_type in DefaultProcedureTypes {
 							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
-							   &IntType && procedure_type.return_type == &IntType {
+							   &DefaultIntType && procedure_type.return_type == &DefaultIntType {
 								expression.type = procedure_type
 								return nil
 							}
 						}
 						type := new(TypeProcedure)
-						append(&type.parameter_types, &IntType)
-						type.return_type = &IntType
-						append(&ProcedureTypes, type)
+						append(&type.parameter_types, &DefaultIntType)
+						type.return_type = &DefaultIntType
+						append(&DefaultProcedureTypes, type)
 						expression.type = type
 						return nil
 					case .PrintBool:
-						for procedure_type in ProcedureTypes {
+						for procedure_type in DefaultProcedureTypes {
 							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
-							   &BoolType && procedure_type.return_type == &IntType {
+							   &DefaultBoolType && procedure_type.return_type == &DefaultIntType {
 								expression.type = procedure_type
 								return nil
 							}
 						}
 						type := new(TypeProcedure)
-						append(&type.parameter_types, &BoolType)
-						type.return_type = &IntType
-						append(&ProcedureTypes, type)
+						append(&type.parameter_types, &DefaultBoolType)
+						type.return_type = &DefaultIntType
+						append(&DefaultProcedureTypes, type)
 						expression.type = type
 						return nil
 					case .Println:
-						for procedure_type in ProcedureTypes {
-							if len(procedure_type.parameter_types) == 0 && procedure_type.return_type == &VoidType {
+						for procedure_type in DefaultProcedureTypes {
+							if len(procedure_type.parameter_types) == 0 && procedure_type.return_type == &DefaultVoidType {
 								expression.type = procedure_type
 								return nil
 							}
 						}
 						type := new(TypeProcedure)
-						type.return_type = &VoidType
-						append(&ProcedureTypes, type)
+						type.return_type = &DefaultVoidType
+						append(&DefaultProcedureTypes, type)
 						expression.type = type
 						return nil
 					case:
@@ -308,7 +352,7 @@ ResolveExpression :: proc(
 			message = fmt.aprintf("'%s' is not declared", name),
 		}
 	case ^AstInteger:
-		expression.type = &IntType
+		expression.type = &DefaultIntType
 		value := expression.integer_token.data.(u128)
 		if value >= cast(u128)max(int) {
 			return Error{

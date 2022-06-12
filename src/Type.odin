@@ -4,6 +4,7 @@ import "core:fmt"
 
 Type :: union #shared_nil {
 	^TypeVoid,
+	^TypeType,
 	^TypeInt,
 	^TypeBool,
 	^TypePointer,
@@ -11,6 +12,8 @@ Type :: union #shared_nil {
 }
 
 TypeVoid :: struct {}
+
+TypeType :: struct {}
 
 TypeInt :: struct {}
 
@@ -36,6 +39,9 @@ DumpType :: proc(type: Type, indent: uint) {
 	case ^TypeVoid:
 		PrintIndent(indent)
 		fmt.println("- Void Type")
+	case ^TypeType:
+		PrintIndent(indent)
+		fmt.println("- Type Type")
 	case ^TypeInt:
 		PrintIndent(indent)
 		fmt.println("- Int Type")
@@ -64,18 +70,19 @@ DumpType :: proc(type: Type, indent: uint) {
 	}
 }
 
-VoidType := TypeVoid{}
-IntType := TypeInt{}
-BoolType := TypeBool{}
-PointerTypes := make(map[Type]TypePointer)
-ProcedureTypes := make([dynamic]^TypeProcedure)
+DefaultVoidType := TypeVoid{}
+DefaultTypeType := TypeType{}
+DefaultIntType := TypeInt{}
+DefaultBoolType := TypeBool{}
+DefaultPointerTypes := make(map[Type]TypePointer)
+DefaultProcedureTypes := make([dynamic]^TypeProcedure)
 
 GetPointerType :: proc(pointer_to: Type) -> Type {
-	if type, ok := &PointerTypes[pointer_to]; ok {
+	if type, ok := &DefaultPointerTypes[pointer_to]; ok {
 		return type
 	}
-	PointerTypes[pointer_to] = TypePointer {
+	DefaultPointerTypes[pointer_to] = TypePointer {
 		pointer_to = pointer_to,
 	}
-	return &PointerTypes[pointer_to]
+	return &DefaultPointerTypes[pointer_to]
 }

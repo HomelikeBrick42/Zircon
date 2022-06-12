@@ -24,6 +24,9 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	case ^TypeVoid:
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "void %s", name)
+	case ^TypeType:
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "type %s", name)
 	case ^TypeInt:
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "int %s", name)
@@ -52,6 +55,8 @@ EmitAst_C :: proc(
 			buffer,
 			`#include <stdio.h>
 #include <stdbool.h>
+
+typedef type size_t;
 
 static char stack[1024 * 1024];
 static char* sp = stack + (1024 * 1024);
