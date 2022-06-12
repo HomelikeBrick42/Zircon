@@ -93,6 +93,11 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 	error: Maybe(Error),
 ) {
 	#partial switch Lexer_CurrentToken(lexer^) or_return.kind {
+	case .OpenParenthesis:
+		Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
+		expression := ParseExpression(lexer) or_return
+		Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		return expression, nil
 	case .Name:
 		name := new(AstName)
 		name.name_token = Lexer_ExpectToken(lexer, .Name) or_return
