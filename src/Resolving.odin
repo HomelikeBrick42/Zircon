@@ -92,6 +92,15 @@ ResolveStatement :: proc(
 			ResolveStatement(else_body, names) or_return
 		}
 		return nil
+	case ^AstWhile:
+		ResolveExpression(statement.condition, names) or_return
+		ExpectType(
+			GetType(statement.condition),
+			&BoolType,
+			statement.while_token.location,
+		) or_return
+		ResolveStatement(statement.body, names) or_return
+		return nil
 	case AstExpression:
 		return ResolveExpression(statement, names)
 	case:

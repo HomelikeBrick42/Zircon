@@ -50,6 +50,12 @@ ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)
 		return ParseScope(lexer)
 	case .If:
 		return ParseIf(lexer)
+	case .While:
+		while := new(AstWhile)
+		while.while_token = Lexer_ExpectToken(lexer, .While) or_return
+		while.condition = ParseExpression(lexer) or_return
+		while.body = ParseScope(lexer) or_return
+		return while, nil
 	case .Name:
 		copy := lexer^
 		name_token := Lexer_ExpectToken(lexer, .Name) or_return

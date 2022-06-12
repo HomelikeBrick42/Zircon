@@ -190,6 +190,43 @@ EmitStatement_C :: proc(
 			fmt.sbprintf(buffer, "else\n")
 			EmitStatement_C(else_body, names, indent, buffer)
 		}
+	case ^AstWhile:
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// while\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.while_token.line,
+			statement.while_token.filepath,
+		)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "while (true)\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.while_token.line,
+			statement.while_token.filepath,
+		)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "{{\n")
+		condition := EmitExpression_C(statement.condition, names, indent + 1, buffer)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.while_token.line,
+			statement.while_token.filepath,
+		)
+		PrintIndent(indent + 1, buffer)
+		fmt.sbprintf(buffer, "if (!_%d) break;\n", condition)
+		EmitStatement_C(statement.body, names, indent + 1, buffer)
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			statement.while_token.line,
+			statement.while_token.filepath,
+		)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "}}\n")
 	case AstExpression:
 		EmitExpression_C(statement, names, indent, buffer)
 	case:

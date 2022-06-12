@@ -12,6 +12,7 @@ AstStatement :: union #shared_nil {
 	^AstDeclaration,
 	^AstAssignment,
 	^AstIf,
+	^AstWhile,
 	AstExpression,
 }
 
@@ -56,6 +57,12 @@ AstIf :: struct {
 	then_body:  ^AstScope,
 	else_token: Token,
 	else_body:  Maybe(^AstScope),
+}
+
+AstWhile :: struct {
+	while_token: Token,
+	condition:   AstExpression,
+	body:        ^AstScope,
 }
 
 UnaryOperatorKind :: enum {
@@ -196,6 +203,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			fmt.println("Value:")
 			DumpAst(AstStatement(ast.value), indent + 2)
 		case ^AstIf:
+			unimplemented()
+		case ^AstWhile:
 			unimplemented()
 		case AstExpression:
 			switch ast in ast {

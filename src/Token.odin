@@ -48,6 +48,7 @@ TokenKind :: enum {
 	// Keywords
 	If,
 	Else,
+    While,
 }
 
 TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
@@ -56,6 +57,8 @@ TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
 		return .If
 	case "else":
 		return .Else
+	case "while":
+		return .While
 	case:
 		return nil
 	}
@@ -151,6 +154,8 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "if"
 	case .Else:
 		return "else"
+	case .While:
+		return "while"
 	}
 	return "{invalid}"
 }
@@ -170,7 +175,7 @@ TokenData :: union {
 Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	switch token.kind {
-	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .If, .Else:
+	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .If, .Else, .While:
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))

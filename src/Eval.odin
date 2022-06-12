@@ -56,6 +56,8 @@ EvalStatement :: proc(
 		return nil
 	case ^AstIf:
 		unimplemented()
+	case ^AstWhile:
+		unimplemented()
 	case AstExpression:
 		_, error := EvalExpression(statement, names)
 		return error
