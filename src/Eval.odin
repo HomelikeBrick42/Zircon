@@ -106,6 +106,10 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]map[string]Va
 		case:
 			unreachable()
 		}
+	case ^AstAddressOf:
+		unimplemented()
+	case ^AstDereference:
+		unimplemented()
 	case ^AstCall:
 		operand := EvalExpression(expression.operand, names) or_return
 		switch operand.(Builtin) {
@@ -200,6 +204,10 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]map[string]Val
 			message  = fmt.aprintf("A call is not addressable"),
 		}
 		return nil, error
+	case ^AstAddressOf:
+		unimplemented()
+	case ^AstDereference:
+		unimplemented()
 	case ^AstName:
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {

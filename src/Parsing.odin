@@ -126,6 +126,8 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 			return 4, .Negation
 		case .ExclamationMark:
 			return 4, .LogicalNot
+		case .Caret:
+			return 4, .Invalid
 		case:
 			return 0, .Invalid
 		}
@@ -156,12 +158,20 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 	left: AstExpression
 	if unary_precedence, kind := GetUnaryPrecedence(
 		   Lexer_CurrentToken(lexer^) or_return.kind,
-	   ); kind != .Invalid {
-		unary := new(AstUnary)
-		unary.operator_kind = kind
-		unary.operator_token = Lexer_NextToken(lexer) or_return
-		unary.operand = ParseBinaryExpression(lexer, unary_precedence) or_return
-		left = unary
+	   ); unary_precedence > 0 {
+		#partial switch Lexer_CurrentToken(lexer^) or_return.kind {
+		case .Caret:
+			address_of := new(AstAddressOf)
+			address_of.caret_token = Lexer_ExpectToken(lexer, .Caret) or_return
+			address_of.operand = ParseBinaryExpression(lexer, unary_precedence) or_return
+			left = address_of
+		case:
+			unary := new(AstUnary)
+			unary.operator_kind = kind
+			unary.operator_token = Lexer_NextToken(lexer) or_return
+			unary.operand = ParseBinaryExpression(lexer, unary_precedence) or_return
+			left = unary
+		}
 	} else {
 		left = ParsePrimaryExpression(lexer) or_return
 	}
@@ -181,6 +191,11 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 			}
 			call.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 			left = call
+		case .Caret:
+			dereference := new(AstDereference)
+			dereference.operand = left
+			dereference.caret_token = Lexer_ExpectToken(lexer, .Caret) or_return
+			left = dereference
 		case:
 			binary_precedence, kind := GetBinaryPrecedence(
 				Lexer_CurrentToken(lexer^) or_return.kind,

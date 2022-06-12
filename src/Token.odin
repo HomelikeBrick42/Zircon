@@ -44,11 +44,12 @@ TokenKind :: enum {
 	EqualEqual,
 	ExclamationMark,
 	ExclamationMarkEqual,
+	Caret,
 
 	// Keywords
 	If,
 	Else,
-    While,
+	While,
 }
 
 TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
@@ -94,6 +95,8 @@ TokenKind_GetCharKind :: proc(chr: rune) -> Maybe(TokenKind) {
 		return .Slash
 	case '!':
 		return .ExclamationMark
+	case '^':
+		return .Caret
 	case:
 		return nil
 	}
@@ -150,6 +153,8 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "!"
 	case .ExclamationMarkEqual:
 		return "!="
+	case .Caret:
+		return "^"
 	case .If:
 		return "if"
 	case .Else:
@@ -175,7 +180,7 @@ TokenData :: union {
 Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	switch token.kind {
-	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .If, .Else, .While:
+	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .Caret, .If, .Else, .While:
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))

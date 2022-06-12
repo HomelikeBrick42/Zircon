@@ -247,6 +247,10 @@ EmitAddressOf_C :: proc(
 		unreachable()
 	case ^AstCall:
 		unreachable()
+	case ^AstAddressOf:
+		unreachable()
+	case ^AstDereference:
+		return EmitExpression_C(expression.operand, names, indent, buffer)
 	case ^AstName:
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
@@ -542,6 +546,22 @@ EmitExpression_C :: proc(
 			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
 			fmt.sbprintf(buffer, ");\n")
 		}
+		return id
+	case ^AstAddressOf:
+		return EmitAddressOf_C(expression.operand, names, indent, buffer)
+	case ^AstDereference:
+		operand := EmitExpression_C(expression.operand, names, indent, buffer)
+		id := GetID()
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "// dereference\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.caret_token.line,
+			expression.caret_token.filepath,
+		)
+		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+		fmt.sbprintf(buffer, " = *_%d;\n", operand)
 		return id
 	case ^AstName:
 		name := expression.name_token.data.(string)

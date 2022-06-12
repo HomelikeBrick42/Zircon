@@ -1,6 +1,7 @@
 i := 0
-while i != 10 {
+p := ^i
+while p^ != 10 {
     print_int(i)
     println()
-    i = i + 1
+    p^ = i + 1
 }

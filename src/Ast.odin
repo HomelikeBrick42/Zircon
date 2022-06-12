@@ -20,6 +20,8 @@ AstExpression :: union #shared_nil {
 	^AstUnary,
 	^AstBinary,
 	^AstCall,
+	^AstAddressOf,
+	^AstDereference,
 	^AstName,
 	^AstInteger,
 }
@@ -98,11 +100,20 @@ AstBinary :: struct {
 }
 
 AstCall :: struct {
-	type:                    Type,
 	operand:                 AstExpression,
 	open_parenthesis_token:  Token,
 	arguments:               [dynamic]AstExpression,
 	close_parenthesis_token: Token,
+}
+
+AstAddressOf :: struct {
+	caret_token: Token,
+	operand:     AstExpression,
+}
+
+AstDereference :: struct {
+	operand:     AstExpression,
+	caret_token: Token,
 }
 
 AstName :: struct {
@@ -122,7 +133,11 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstBinary:
 		return expression.type
 	case ^AstCall:
-		return expression.type
+		return GetType(expression.operand).(^TypeProcedure).return_type
+	case ^AstAddressOf:
+		return GetPointerType(GetType(expression.operand))
+	case ^AstDereference:
+		return GetType(expression.operand).(^TypePointer).pointer_to
 	case ^AstName:
 		return expression.type
 	case ^AstInteger:
@@ -225,8 +240,12 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				PrintIndent(indent + 1)
 				fmt.println("Right:")
 				DumpAst(AstStatement(ast.right), indent + 2)
+			case ^AstAddressOf:
+				unimplemented()
+			case ^AstDereference:
+				unimplemented()
 			case ^AstCall:
-				PrintHeader("Call", ast.open_parenthesis_token.location, ast.type, indent)
+				PrintHeader("Call", ast.open_parenthesis_token.location, GetType(ast), indent)
 				PrintIndent(indent + 1)
 				fmt.println("Operand:")
 				DumpAst(AstStatement(ast.operand), indent + 2)

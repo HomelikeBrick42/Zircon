@@ -116,6 +116,10 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		return false
 	case ^AstCall:
 		return false
+	case ^AstAddressOf:
+		return false
+	case ^AstDereference:
+		return true
 	case ^AstName:
 		return true
 	case ^AstInteger:
@@ -222,7 +226,24 @@ ResolveExpression :: proc(
 				expression.open_parenthesis_token.location,
 			) or_return
 		}
-		expression.type = procedure_type.return_type
+		return nil
+	case ^AstAddressOf:
+		ResolveExpression(expression.operand, names) or_return
+		if !IsAddressable(expression.operand) {
+			return Error{
+				location = expression.caret_token.location,
+				message = fmt.aprintf("Expression is not addressable"),
+			}
+		}
+		return nil
+	case ^AstDereference:
+		ResolveExpression(expression.operand, names) or_return
+		if _, ok := GetType(expression.operand).(^TypePointer); !ok {
+			return Error{
+				location = expression.caret_token.location,
+				message = fmt.aprintf("Cannot dereference a %v", GetType(expression.operand)),
+			}
+		}
 		return nil
 	case ^AstName:
 		name := expression.name_token.data.(string)
