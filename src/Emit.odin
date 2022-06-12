@@ -68,7 +68,7 @@ int main() {{
     _print_int: {{
         void* retAddress = *(void**)sp;
         Int value = *(Int*)(sp + sizeof(void*));
-        Int numCharacters = (Int)printf("%%d", value);
+        Int numCharacters = (Int)printf("%%lld", value);
         sp -= sizeof(Int);
         *(Int*)sp = numCharacters;
         goto *retAddress;
