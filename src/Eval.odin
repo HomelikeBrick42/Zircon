@@ -10,141 +10,119 @@ Builtin :: enum {
 
 Value :: union {
 	Builtin,
+	Type,
+	^Value,
 	int,
 	bool,
 }
 
-EvalAst :: proc(ast: Ast, names: ^[dynamic]map[string]Value) -> Maybe(Error) {
+EvalAst :: proc(ast: Ast, names: ^[dynamic]map[string]Value) {
 	switch ast in ast {
 	case ^AstFile:
 		append(names, map[string]Value{})
 		for statement in ast.statements {
-			EvalStatement(statement, names) or_return
+			EvalStatement(statement, names)
 		}
 		delete(pop(names))
-		return nil
 	case AstStatement:
-		return EvalStatement(ast, names)
+		EvalStatement(ast, names)
 	case:
 		unreachable()
 	}
 }
 
-EvalStatement :: proc(
-	statement: AstStatement,
-	names: ^[dynamic]map[string]Value,
-) -> Maybe(Error) {
+EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]map[string]Value) {
 	switch statement in statement {
 	case ^AstScope:
-		unimplemented()
-	case ^AstDeclaration:
-		value := EvalExpression(statement.value, names) or_return
-		name := statement.name_token.data.(string)
-		scope := &names[len(names) - 1]
-		if _, ok := scope[name]; ok {
-			return Error{
-				location = statement.name_token.location,
-				message = fmt.aprintf("'%v' is already declared", name),
-			}
+		append(names, map[string]Value{})
+		for statement in statement.statements {
+			EvalStatement(statement, names)
 		}
-		scope[name] = value
-		return nil
+		delete(pop(names))
+	case ^AstDeclaration:
+		value := EvalExpression(statement.value, names)
+		name := statement.name_token.data.(string)
+		names[len(names) - 1][name] = value
 	case ^AstAssignment:
-		operand := EvalAddressOf(statement.operand, names) or_return
-		value := EvalExpression(statement.value, names) or_return
+		operand := EvalAddressOf(statement.operand, names)
+		value := EvalExpression(statement.value, names)
 		operand^ = value
-		return nil
 	case ^AstIf:
-		unimplemented()
+		condition := EvalExpression(statement.condition, names)
+		if condition.(bool) {
+			EvalStatement(statement.then_body, names)
+		} else if else_body, ok := statement.else_body.?; ok {
+			EvalStatement(else_body, names)
+		}
 	case ^AstWhile:
-		unimplemented()
+		for {
+			condition := EvalExpression(statement.condition, names)
+			if !condition.(bool) do break
+			EvalStatement(statement.body, names)
+		}
 	case AstExpression:
-		_, error := EvalExpression(statement, names)
-		return error
+		EvalExpression(statement, names)
 	case:
 		unreachable()
 	}
 }
 
-EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]map[string]Value) -> (
-	value: Value,
-	error: Maybe(Error),
-) {
+EvalExpression :: proc(
+	expression: AstExpression,
+	names: ^[dynamic]map[string]Value,
+) -> Value {
 	switch expression in expression {
 	case ^AstUnary:
-		operand := EvalExpression(expression.operand, names) or_return
+		operand := EvalExpression(expression.operand, names)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Identity:
-			return +operand.(int), nil
+			return +operand.(int)
 		case .Negation:
-			return -operand.(int), nil
+			return -operand.(int)
 		case .LogicalNot:
-			return !operand.(bool), nil
+			return !operand.(bool)
 		case:
 			unreachable()
 		}
 	case ^AstBinary:
-		left := EvalExpression(expression.left, names) or_return
-		right := EvalExpression(expression.right, names) or_return
+		left := EvalExpression(expression.left, names)
+		right := EvalExpression(expression.right, names)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Addition:
-			return left.(int) + right.(int), nil
+			return left.(int) + right.(int)
 		case .Subtraction:
-			return left.(int) - right.(int), nil
+			return left.(int) - right.(int)
 		case .Multiplication:
-			return left.(int) * right.(int), nil
+			return left.(int) * right.(int)
 		case .Division:
-			return left.(int) / right.(int), nil
+			return left.(int) / right.(int)
 		case .Equal:
-			return left == right, nil
+			return left == right
 		case .NotEqual:
-			return left != right, nil
+			return left != right
 		case:
 			unreachable()
 		}
 	case ^AstAddressOf:
-		unimplemented()
+		return EvalAddressOf(expression.operand, names)
 	case ^AstDereference:
-		unimplemented()
+		return EvalExpression(expression.operand, names).(^Value)^
 	case ^AstCall:
-		operand := EvalExpression(expression.operand, names) or_return
+		operand := EvalExpression(expression.operand, names)
 		switch operand.(Builtin) {
 		case .PrintInt:
-			if len(expression.arguments) != 1 {
-				error = Error {
-					location = expression.open_parenthesis_token.location,
-					message  = fmt.aprintf("'print_int' expects 1 argument"),
-				}
-				return nil, error
-			}
-			value := EvalExpression(expression.arguments[0], names) or_return
-			fmt.print(value.(int))
-			return nil, nil
+			value := EvalExpression(expression.arguments[0], names)
+			return fmt.print(value.(int))
 		case .PrintBool:
-			if len(expression.arguments) != 1 {
-				error = Error {
-					location = expression.open_parenthesis_token.location,
-					message  = fmt.aprintf("'print_bool' expects 1 argument"),
-				}
-				return nil, error
-			}
-			value := EvalExpression(expression.arguments[0], names) or_return
-			fmt.print(value.(bool))
-			return nil, nil
+			value := EvalExpression(expression.arguments[0], names)
+			return fmt.print(value.(bool))
 		case .Println:
-			if len(expression.arguments) != 0 {
-				error = Error {
-					location = expression.open_parenthesis_token.location,
-					message  = fmt.aprintf("'println' expects 0 argument"),
-				}
-				return nil, error
-			}
 			fmt.println()
-			return nil, nil
+			return nil
 		case:
 			unreachable()
 		}
@@ -152,80 +130,42 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]map[string]Va
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
 			if value, ok := names[i][name]; ok {
-				return value, nil
+				return value
 			}
 		}
-		error = Error {
-			location = expression.name_token.location,
-			message  = fmt.aprintf("'%s' is not declared", name),
-		}
-		return nil, error
+		unreachable()
 	case ^AstInteger:
-		value := expression.integer_token.data.(u128)
-		if value >= cast(u128)max(int) {
-			error = Error {
-				location = expression.integer_token.location,
-				message  = fmt.aprintf("%d is too big for an int", value),
-			}
-			return nil, error
-		}
-		return int(value), nil
+		return int(expression.integer_token.data.(u128))
 	case:
 		unreachable()
 	}
 }
 
-EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]map[string]Value) -> (
-	value: ^Value,
-	error: Maybe(Error),
-) {
+EvalAddressOf :: proc(
+	expression: AstExpression,
+	names: ^[dynamic]map[string]Value,
+) -> ^Value {
 	switch expression in expression {
 	case ^AstUnary:
-		error = Error {
-			location = expression.operator_token.location,
-			message  = fmt.aprintf(
-				"Unary operator %v is not addressable",
-				expression.operator_kind,
-			),
-		}
-		return nil, error
+		unreachable()
 	case ^AstBinary:
-		error = Error {
-			location = expression.operator_token.location,
-			message  = fmt.aprintf(
-				"Binary operator %v is not addressable",
-				expression.operator_kind,
-			),
-		}
-		return nil, error
+		unreachable()
 	case ^AstCall:
-		error = Error {
-			location = expression.open_parenthesis_token.location,
-			message  = fmt.aprintf("A call is not addressable"),
-		}
-		return nil, error
+		unreachable()
 	case ^AstAddressOf:
-		unimplemented()
+		unreachable()
 	case ^AstDereference:
-		unimplemented()
+		return EvalAddressOf(expression.operand, names)
 	case ^AstName:
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
 			if value, ok := &names[i][name]; ok {
-				return value, nil
+				return value
 			}
 		}
-		error = Error {
-			location = expression.name_token.location,
-			message  = fmt.aprintf("'%s' is not declared", name),
-		}
-		return nil, error
+		unreachable()
 	case ^AstInteger:
-		error = Error {
-			location = expression.integer_token.location,
-			message  = fmt.aprintf("An integer is not addressable", value),
-		}
-		return nil, error
+		unreachable()
 	case:
 		unreachable()
 	}

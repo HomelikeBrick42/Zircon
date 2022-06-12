@@ -76,6 +76,30 @@ main :: proc() {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
+
+		{
+			names: [dynamic]Scope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			append(
+				&names,
+				Scope{
+					"print_int" = Builtin.PrintInt,
+					"print_bool" = Builtin.PrintBool,
+					"println" = Builtin.Println,
+				},
+			)
+			error := ResolveAst(ast, &names)
+			if error, ok := error.?; ok {
+				fmt.eprintf("%v: %s\n", error.location, error.message)
+				os.exit(1)
+			}
+		}
+
 		names: [dynamic]map[string]Value
 		defer {
 			for scope in names {
@@ -91,17 +115,14 @@ main :: proc() {
 				"println" = Builtin.Println,
 			},
 		)
-		error = EvalAst(ast, &names)
-		if error, ok := error.?; ok {
-			fmt.eprintf("%v: %s\n", error.location, error.message)
-			os.exit(1)
-		}
+		EvalAst(ast, &names)
 	case "emit_c":
 		ast, error := ParseFile(filepath, source)
 		if error, ok := error.?; ok {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
+
 		names: [dynamic]Scope
 		defer {
 			for scope in names {

@@ -218,9 +218,26 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			fmt.println("Value:")
 			DumpAst(AstStatement(ast.value), indent + 2)
 		case ^AstIf:
-			unimplemented()
+			PrintHeader("If", ast.if_token.location, nil, indent)
+			PrintIndent(indent + 1)
+			fmt.println("Condition:")
+			DumpAst(AstStatement(ast.condition), indent + 2)
+			PrintIndent(indent + 1)
+			fmt.println("Then:")
+			DumpAst(AstStatement(ast.then_body), indent + 2)
+			if else_body, ok := ast.else_body.?; ok {
+				PrintIndent(indent + 1)
+				fmt.println("Else:")
+				DumpAst(AstStatement(else_body), indent + 2)
+			}
 		case ^AstWhile:
-			unimplemented()
+			PrintHeader("While", ast.while_token.location, nil, indent)
+			PrintIndent(indent + 1)
+			fmt.println("Condition:")
+			DumpAst(AstStatement(ast.condition), indent + 2)
+			PrintIndent(indent + 1)
+			fmt.println("Body:")
+			DumpAst(AstStatement(ast.body), indent + 2)
 		case AstExpression:
 			switch ast in ast {
 			case ^AstUnary:
@@ -241,9 +258,15 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				fmt.println("Right:")
 				DumpAst(AstStatement(ast.right), indent + 2)
 			case ^AstAddressOf:
-				unimplemented()
+				PrintHeader("Address Of", ast.caret_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Operand:")
+				DumpAst(AstStatement(ast.operand), indent + 2)
 			case ^AstDereference:
-				unimplemented()
+				PrintHeader("Dereference", ast.caret_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Operand:")
+				DumpAst(AstStatement(ast.operand), indent + 2)
 			case ^AstCall:
 				PrintHeader("Call", ast.open_parenthesis_token.location, GetType(ast), indent)
 				PrintIndent(indent + 1)
