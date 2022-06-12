@@ -23,21 +23,21 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	switch type in type {
 	case ^TypeVoid:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "void %s", name)
+		fmt.sbprintf(buffer, "Void %s", name)
 	case ^TypeType:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "type %s", name)
+		fmt.sbprintf(buffer, "Type %s", name)
 	case ^TypeInt:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "int %s", name)
+		fmt.sbprintf(buffer, "Int %s", name)
 	case ^TypeBool:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "bool %s", name)
+		fmt.sbprintf(buffer, "Bool %s", name)
 	case ^TypePointer:
 		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
 	case ^TypeProcedure:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "void* %s", name)
+		fmt.sbprintf(buffer, "Void* %s", name)
 	case:
 		unreachable()
 	}
@@ -54,9 +54,11 @@ EmitAst_C :: proc(
 		fmt.sbprintf(
 			buffer,
 			`#include <stdio.h>
-#include <stdbool.h>
 
-typedef type size_t;
+typedef void Void;
+typedef size_t Type;
+typedef signed long long Int;
+typedef _Bool Bool;
 
 static char stack[1024 * 1024];
 static char* sp = stack + (1024 * 1024);
@@ -65,18 +67,18 @@ int main() {{
     goto _main;
     _print_int: {{
         void* retAddress = *(void**)sp;
-        int value = *(int*)(sp + sizeof(void*));
-        int numCharacters = printf("%%d", value);
-        sp -= sizeof(int);
-        *(int*)sp = numCharacters;
+        Int value = *(Int*)(sp + sizeof(void*));
+        Int numCharacters = (Int)printf("%%d", value);
+        sp -= sizeof(Int);
+        *(Int*)sp = numCharacters;
         goto *retAddress;
     }}
     _print_bool: {{
         void* retAddress = *(void**)sp;
-        bool value = *(bool*)(sp + sizeof(void*));
-        int numCharacters = printf(value ? "true" : "false");
-        sp -= sizeof(int);
-        *(int*)sp = numCharacters;
+        Bool value = *(Bool*)(sp + sizeof(void*));
+        Int numCharacters = (Int)printf(value ? "true" : "false");
+        sp -= sizeof(Int);
+        *(Int*)sp = numCharacters;
         goto *retAddress;
     }}
     _println: {{
@@ -195,7 +197,7 @@ EmitStatement_C :: proc(
 			statement.while_token.filepath,
 		)
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "while (true)\n")
+		fmt.sbprintf(buffer, "for (;;)\n")
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
