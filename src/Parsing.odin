@@ -63,8 +63,13 @@ ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)
 			declaration := new(AstDeclaration)
 			declaration.name_token = name_token
 			declaration.colon_token = Lexer_ExpectToken(lexer, .Colon) or_return
-			declaration.equal_token = Lexer_ExpectToken(lexer, .Equal) or_return
-			declaration.value = ParseExpression(lexer) or_return
+			if Lexer_CurrentToken(lexer^) or_return.kind != .Equal {
+				declaration.type = ParseExpression(lexer) or_return
+			}
+			if Lexer_CurrentToken(lexer^) or_return.kind == .Equal {
+				declaration.equal_token = Lexer_ExpectToken(lexer, .Equal) or_return
+				declaration.value = ParseExpression(lexer) or_return
+			}
 			return declaration, nil
 		} else {
 			lexer^ = copy
@@ -133,6 +138,8 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 			return 4, .LogicalNot
 		case .Caret:
 			return 4, .Invalid
+		case .Asterisk:
+			return 4, .Pointer
 		case:
 			return 0, .Invalid
 		}

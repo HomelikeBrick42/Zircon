@@ -48,8 +48,51 @@ ResolveStatement :: proc(
 		delete(pop(names))
 		return nil
 	case ^AstDeclaration:
-		ResolveExpression(statement.value, names) or_return
-		statement.resolved_type = GetType(statement.value)
+		if type, ok := statement.type.?; ok {
+			ResolveExpression(type, names) or_return
+			if !IsConstant(type) {
+				return Error{
+					location = statement.name_token.location,
+					message = fmt.aprintf("Declaration type must be a constant"),
+				}
+			}
+			ExpectType(GetType(type), &DefaultTypeType, statement.colon_token.location) or_return
+
+			{
+				// TODO: get this from somewhere else
+				names: [dynamic]map[string]Value
+				defer {
+					for scope in names {
+						delete(scope)
+					}
+					delete(names)
+				}
+				append(
+					&names,
+					map[string]Value{
+						"type" = Builtin.Type,
+						"int" = Builtin.Int,
+						"bool" = Builtin.Bool,
+						"print_int" = Builtin.PrintInt,
+						"print_bool" = Builtin.PrintBool,
+						"println" = Builtin.Println,
+					},
+				)
+				statement.resolved_type = EvalExpression(type, &names).(Type)
+			}
+		}
+		if value, ok := statement.value.?; ok {
+			ResolveExpression(value, names) or_return
+			if statement.value != nil {
+				ExpectType(
+					statement.resolved_type,
+					GetType(value),
+					statement.equal_token.?.location,
+				) or_return
+			} else {
+				statement.resolved_type = GetType(value)
+			}
+		}
 		name := statement.name_token.data.(string)
 		scope := &names[len(names) - 1]
 		if _, ok := scope[name]; ok {
@@ -129,6 +172,27 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 	}
 }
 
+IsConstant :: proc(expression: AstExpression) -> bool {
+	switch expression in expression {
+	case ^AstUnary:
+		return IsConstant(expression.operand)
+	case ^AstBinary:
+		return IsConstant(expression.left) && IsConstant(expression.right)
+	case ^AstCall:
+		return false
+	case ^AstAddressOf:
+		return false
+	case ^AstDereference:
+		return false
+	case ^AstName:
+		return expression.is_constant
+	case ^AstInteger:
+		return true
+	case:
+		unreachable()
+	}
+}
+
 ResolveExpression :: proc(
 	expression: AstExpression,
 	names: ^[dynamic]Scope,
@@ -139,6 +203,20 @@ ResolveExpression :: proc(
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
+		case .Pointer:
+			ExpectType(
+				GetType(expression.operand),
+				&DefaultTypeType,
+				expression.operator_token,
+			) or_return
+			if !IsConstant(expression.operand) {
+				return Error{
+					location = expression.operator_token.location,
+					message = fmt.aprintf("Type is not a constant"),
+				}
+			}
+			expression.type = GetType(expression.operand)
+			return nil
 		case .Identity:
 			ExpectType(
 				GetType(expression.operand),
@@ -296,6 +374,10 @@ ResolveExpression :: proc(
 				switch decl in decl {
 				case Builtin:
 					switch decl {
+					case .Type, .Int, .Bool:
+						expression.type = &DefaultTypeType
+						expression.is_constant = true
+						return nil
 					case .PrintInt:
 						for procedure_type in DefaultProcedureTypes {
 							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==

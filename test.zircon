@@ -1,5 +1,5 @@
-i := 0
-p := ^i
+i: int = 0
+p: *int = ^i
 while (^p)^^ != 10 {
     print_int(i)
     println()

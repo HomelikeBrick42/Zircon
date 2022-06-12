@@ -43,6 +43,28 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	}
 }
 
+EmitDefaultValue :: proc(type: Type, indent: uint, buffer: ^strings.Builder) -> uint {
+	PrintIndent(indent, buffer)
+	id := GetID()
+	switch type in type {
+	case ^TypeVoid:
+		unreachable()
+	case ^TypeType:
+		fmt.sbprintf(buffer, "Type _%d = 0;", id)
+	case ^TypeInt:
+		fmt.sbprintf(buffer, "Int _%d = 0;", id)
+	case ^TypeBool:
+		fmt.sbprintf(buffer, "Bool _%d = 0;", id)
+	case ^TypePointer:
+		fmt.sbprintf(buffer, "Void* _%d = NULL;", id)
+	case ^TypeProcedure:
+		fmt.sbprintf(buffer, "Void* _%d = NULL;", id)
+	case:
+		unreachable()
+	}
+	return id
+}
+
 EmitAst_C :: proc(
 	ast: Ast,
 	names: ^[dynamic]Scope,
@@ -140,7 +162,12 @@ EmitStatement_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "}}\n")
 	case ^AstDeclaration:
-		value := EmitExpression_C(statement.value, names, indent, buffer)
+		value: uint
+		if val, ok := statement.value.?; ok {
+			value = EmitExpression_C(val, names, indent, buffer)
+		} else {
+			value = EmitDefaultValue(statement.resolved_type, indent, buffer)
+		}
 		name := statement.name_token.data.(string)
 		fmt.sbprintf(
 			buffer,
@@ -295,6 +322,8 @@ EmitExpression_C :: proc(
 		operand := EmitExpression_C(expression.operand, names, indent, buffer)
 		switch expression.operator_kind {
 		case .Invalid:
+			unreachable()
+		case .Pointer:
 			unreachable()
 		case .Identity:
 			id := GetID()
@@ -546,6 +575,39 @@ EmitExpression_C :: proc(
 					return id
 				case Builtin:
 					switch decl {
+					case .Type:
+						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultTypeType))
+						return id
+					case .Int:
+						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultIntType))
+						return id
+					case .Bool:
+						id := GetID()
+						fmt.sbprintf(
+							buffer,
+							"#line %d \"%s\"\n",
+							expression.name_token.line,
+							expression.name_token.filepath,
+						)
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultBoolType))
+						return id
 					case .PrintInt:
 						id := GetID()
 						fmt.sbprintf(

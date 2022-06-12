@@ -3,6 +3,9 @@ package zircon
 import "core:fmt"
 
 Builtin :: enum {
+	Type,
+	Int,
+	Bool,
 	PrintInt,
 	PrintBool,
 	Println,
@@ -14,6 +17,25 @@ Value :: union {
 	^Value,
 	int,
 	bool,
+}
+
+GetDefaultValue :: proc(type: Type) -> Value {
+	switch type in type {
+	case ^TypeVoid:
+		return nil
+	case ^TypeType:
+		return Type(nil)
+	case ^TypeInt:
+		return 0
+	case ^TypeBool:
+		return false
+	case ^TypePointer:
+		return (^Value)(nil)
+	case ^TypeProcedure:
+		return nil
+	case:
+		unreachable()
+	}
 }
 
 EvalAst :: proc(ast: Ast, names: ^[dynamic]map[string]Value) {
@@ -40,7 +62,12 @@ EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]map[string]Value
 		}
 		delete(pop(names))
 	case ^AstDeclaration:
-		value := EvalExpression(statement.value, names)
+		value: Value
+		if val, ok := statement.value.?; ok {
+			value = EvalExpression(val, names)
+		} else {
+			value = GetDefaultValue(statement.resolved_type)
+		}
 		name := statement.name_token.data.(string)
 		names[len(names) - 1][name] = value
 	case ^AstAssignment:
@@ -77,6 +104,8 @@ EvalExpression :: proc(
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
+		case .Pointer:
+			return GetPointerType(operand.(Type))
 		case .Identity:
 			return +operand.(int)
 		case .Negation:
@@ -114,6 +143,12 @@ EvalExpression :: proc(
 	case ^AstCall:
 		operand := EvalExpression(expression.operand, names)
 		switch operand.(Builtin) {
+		case .Type:
+			unreachable()
+		case .Int:
+			unreachable()
+		case .Bool:
+			unreachable()
 		case .PrintInt:
 			value := EvalExpression(expression.arguments[0], names)
 			return fmt.print(value.(int))
@@ -130,6 +165,24 @@ EvalExpression :: proc(
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
 			if value, ok := names[i][name]; ok {
+				if builtin, ok := value.(Builtin); ok {
+					switch builtin {
+					case .Type:
+						return Type(&DefaultTypeType)
+					case .Int:
+						return Type(&DefaultIntType)
+					case .Bool:
+						return Type(&DefaultBoolType)
+					case .PrintInt:
+						break
+					case .PrintBool:
+						break
+					case .Println:
+						break
+					case:
+						unreachable()
+					}
+				}
 				return value
 			}
 		}

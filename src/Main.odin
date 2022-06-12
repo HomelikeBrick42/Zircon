@@ -88,6 +88,9 @@ main :: proc() {
 			append(
 				&names,
 				Scope{
+					"type" = Builtin.Type,
+					"int" = Builtin.Int,
+					"bool" = Builtin.Bool,
 					"print_int" = Builtin.PrintInt,
 					"print_bool" = Builtin.PrintBool,
 					"println" = Builtin.Println,
@@ -110,6 +113,9 @@ main :: proc() {
 		append(
 			&names,
 			map[string]Value{
+				"type" = Builtin.Type,
+				"int" = Builtin.Int,
+				"bool" = Builtin.Bool,
 				"print_int" = Builtin.PrintInt,
 				"print_bool" = Builtin.PrintBool,
 				"println" = Builtin.Println,
@@ -133,6 +139,9 @@ main :: proc() {
 		append(
 			&names,
 			Scope{
+				"type" = Builtin.Type,
+				"int" = Builtin.Int,
+				"bool" = Builtin.Bool,
 				"print_int" = Builtin.PrintInt,
 				"print_bool" = Builtin.PrintBool,
 				"println" = Builtin.Println,

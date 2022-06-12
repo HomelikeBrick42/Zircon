@@ -42,9 +42,9 @@ AstDeclaration :: struct {
 	resolved_type: Type,
 	name_token:    Token,
 	colon_token:   Token,
-	// TODO: add type
-	equal_token:   Token,
-	value:         AstExpression,
+	type:          Maybe(AstExpression),
+	equal_token:   Maybe(Token),
+	value:         Maybe(AstExpression),
 }
 
 AstAssignment :: struct {
@@ -72,6 +72,7 @@ UnaryOperatorKind :: enum {
 	Identity,
 	Negation,
 	LogicalNot,
+	Pointer,
 }
 
 AstUnary :: struct {
@@ -117,8 +118,9 @@ AstDereference :: struct {
 }
 
 AstName :: struct {
-	type:       Type,
-	name_token: Token,
+	type:        Type,
+	name_token:  Token,
+	is_constant: bool,
 }
 
 AstInteger :: struct {
@@ -203,12 +205,18 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			fmt.printf("Name: '%s'\n", ast.name_token.data.(string))
 			if ast.resolved_type != nil {
 				PrintIndent(indent + 1)
-				fmt.println("Type:")
+				fmt.println("Resolved Type:")
 				DumpType(ast.resolved_type, indent + 2)
+			} else if type, ok := ast.type.?; ok {
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpAst(AstStatement(type), indent + 2)
 			}
-			PrintIndent(indent + 1)
-			fmt.println("Value:")
-			DumpAst(AstStatement(ast.value), indent + 2)
+			if value, ok := ast.value.?; ok {
+				PrintIndent(indent + 1)
+				fmt.println("Value:")
+				DumpAst(AstStatement(value), indent + 2)
+			}
 		case ^AstAssignment:
 			PrintHeader("Assignment", ast.equal_token.location, nil, indent)
 			PrintIndent(indent + 1)
