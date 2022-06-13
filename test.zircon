@@ -1,4 +1,4 @@
-i: int = 0
+i: int
 p: *int = ^i
 while (^p)^^ != 10 {
     print_int(i)

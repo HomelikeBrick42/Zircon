@@ -118,9 +118,8 @@ AstDereference :: struct {
 }
 
 AstName :: struct {
-	type:        Type,
-	name_token:  Token,
-	is_constant: bool,
+	name_token:    Token,
+	resolved_decl: Decl,
 }
 
 AstInteger :: struct {
@@ -141,7 +140,7 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstDereference:
 		return GetType(expression.operand).(^TypePointer).pointer_to
 	case ^AstName:
-		return expression.type
+		return GetDeclType(expression.resolved_decl)
 	case ^AstInteger:
 		return expression.type
 	case:
@@ -286,7 +285,7 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 					DumpAst(AstStatement(argument), indent + 2)
 				}
 			case ^AstName:
-				PrintHeader("Name", ast.name_token.location, ast.type, indent)
+				PrintHeader("Name", ast.name_token.location, GetType(ast), indent)
 				PrintIndent(indent + 1)
 				fmt.printf("Value: '%s'\n", ast.name_token.data.(string))
 			case ^AstInteger:

@@ -2,9 +2,41 @@ package zircon
 
 import "core:fmt"
 
+Builtin :: enum {
+	Void,
+	Type,
+	Int,
+	Bool,
+	PrintInt,
+	PrintBool,
+	Println,
+}
+
 Decl :: union {
 	Builtin,
 	^AstDeclaration,
+}
+
+GetDeclType :: proc(decl: Decl) -> Type {
+	switch decl in decl {
+	case Builtin:
+		switch decl {
+		case .Void, .Type, .Int, .Bool:
+			return &DefaultTypeType
+		case .PrintInt:
+			return GetProcedureType({Type(&DefaultIntType)}, &DefaultIntType)
+		case .PrintBool:
+			return GetProcedureType({Type(&DefaultBoolType)}, &DefaultIntType)
+		case .Println:
+			return GetProcedureType({}, &DefaultVoidType)
+		case:
+			unreachable()
+		}
+	case ^AstDeclaration:
+		return decl.resolved_type
+	case:
+		unreachable()
+	}
 }
 
 Scope :: map[string]Decl
@@ -58,32 +90,18 @@ ResolveStatement :: proc(
 			}
 			ExpectType(GetType(type), &DefaultTypeType, statement.colon_token.location) or_return
 
-			{
-				// TODO: get this from somewhere else
-				names: [dynamic]map[string]Value
-				defer {
-					for scope in names {
-						delete(scope)
-					}
-					delete(names)
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
 				}
-				append(
-					&names,
-					map[string]Value{
-						"type" = Builtin.Type,
-						"int" = Builtin.Int,
-						"bool" = Builtin.Bool,
-						"print_int" = Builtin.PrintInt,
-						"print_bool" = Builtin.PrintBool,
-						"println" = Builtin.Println,
-					},
-				)
-				statement.resolved_type = EvalExpression(type, &names).(Type)
+				delete(names)
 			}
+			statement.resolved_type = EvalExpression(type, &names).(Type)
 		}
 		if value, ok := statement.value.?; ok {
 			ResolveExpression(value, names) or_return
-			if statement.value != nil {
+			if statement.resolved_type != nil {
 				ExpectType(
 					statement.resolved_type,
 					GetType(value),
@@ -164,7 +182,8 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 	case ^AstDereference:
 		return true
 	case ^AstName:
-		return true
+		_, ok := expression.resolved_decl.(Builtin)
+		return !ok
 	case ^AstInteger:
 		return false
 	case:
@@ -185,7 +204,8 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 	case ^AstDereference:
 		return false
 	case ^AstName:
-		return expression.is_constant
+		_, ok := expression.resolved_decl.(Builtin)
+		return ok
 	case ^AstInteger:
 		return true
 	case:
@@ -371,67 +391,37 @@ ResolveExpression :: proc(
 		name := expression.name_token.data.(string)
 		for i := len(names) - 1; i >= 0; i -= 1 {
 			if decl, ok := names[i][name]; ok {
-				switch decl in decl {
-				case Builtin:
-					switch decl {
-					case .Type, .Int, .Bool:
-						expression.type = &DefaultTypeType
-						expression.is_constant = true
-						return nil
-					case .PrintInt:
-						for procedure_type in DefaultProcedureTypes {
-							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
-							   &DefaultIntType && procedure_type.return_type == &DefaultIntType {
-								expression.type = procedure_type
-								return nil
-							}
-						}
-						type := new(TypeProcedure)
-						append(&type.parameter_types, &DefaultIntType)
-						type.return_type = &DefaultIntType
-						append(&DefaultProcedureTypes, type)
-						expression.type = type
-						return nil
-					case .PrintBool:
-						for procedure_type in DefaultProcedureTypes {
-							if len(procedure_type.parameter_types) == 1 && procedure_type.parameter_types[0] ==
-							   &DefaultBoolType && procedure_type.return_type == &DefaultIntType {
-								expression.type = procedure_type
-								return nil
-							}
-						}
-						type := new(TypeProcedure)
-						append(&type.parameter_types, &DefaultBoolType)
-						type.return_type = &DefaultIntType
-						append(&DefaultProcedureTypes, type)
-						expression.type = type
-						return nil
-					case .Println:
-						for procedure_type in DefaultProcedureTypes {
-							if len(procedure_type.parameter_types) == 0 && procedure_type.return_type == &DefaultVoidType {
-								expression.type = procedure_type
-								return nil
-							}
-						}
-						type := new(TypeProcedure)
-						type.return_type = &DefaultVoidType
-						append(&DefaultProcedureTypes, type)
-						expression.type = type
-						return nil
-					case:
-						unreachable()
-					}
-				case ^AstDeclaration:
-					expression.type = decl.resolved_type
-					return nil
-				case:
-					unreachable()
-				}
+				expression.resolved_decl = decl
+				return nil
 			}
 		}
-		return Error{
-			location = expression.name_token.location,
-			message = fmt.aprintf("'%s' is not declared", name),
+		switch name {
+		case "void":
+			expression.resolved_decl = Builtin.Void
+			return nil
+		case "type":
+			expression.resolved_decl = Builtin.Type
+			return nil
+		case "int":
+			expression.resolved_decl = Builtin.Int
+			return nil
+		case "bool":
+			expression.resolved_decl = Builtin.Bool
+			return nil
+		case "print_int":
+			expression.resolved_decl = Builtin.PrintInt
+			return nil
+		case "print_bool":
+			expression.resolved_decl = Builtin.PrintBool
+			return nil
+		case "println":
+			expression.resolved_decl = Builtin.Println
+			return nil
+		case:
+			return Error{
+				location = expression.name_token.location,
+				message = fmt.aprintf("'%s' is not declared", name),
+			}
 		}
 	case ^AstInteger:
 		expression.type = &DefaultIntType

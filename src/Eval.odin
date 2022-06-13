@@ -2,22 +2,21 @@ package zircon
 
 import "core:fmt"
 
-Builtin :: enum {
-	Type,
-	Int,
-	Bool,
+BuiltinProcedure :: enum {
 	PrintInt,
 	PrintBool,
 	Println,
 }
 
 Value :: union {
-	Builtin,
 	Type,
 	^Value,
 	int,
 	bool,
+	BuiltinProcedure,
 }
+
+EvalScope :: map[^AstDeclaration]Value
 
 GetDefaultValue :: proc(type: Type) -> Value {
 	switch type in type {
@@ -38,10 +37,10 @@ GetDefaultValue :: proc(type: Type) -> Value {
 	}
 }
 
-EvalAst :: proc(ast: Ast, names: ^[dynamic]map[string]Value) {
+EvalAst :: proc(ast: Ast, names: ^[dynamic]EvalScope) {
 	switch ast in ast {
 	case ^AstFile:
-		append(names, map[string]Value{})
+		append(names, EvalScope{})
 		for statement in ast.statements {
 			EvalStatement(statement, names)
 		}
@@ -53,10 +52,10 @@ EvalAst :: proc(ast: Ast, names: ^[dynamic]map[string]Value) {
 	}
 }
 
-EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]map[string]Value) {
+EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]EvalScope) {
 	switch statement in statement {
 	case ^AstScope:
-		append(names, map[string]Value{})
+		append(names, EvalScope{})
 		for statement in statement.statements {
 			EvalStatement(statement, names)
 		}
@@ -69,7 +68,7 @@ EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]map[string]Value
 			value = GetDefaultValue(statement.resolved_type)
 		}
 		name := statement.name_token.data.(string)
-		names[len(names) - 1][name] = value
+		names[len(names) - 1][statement] = value
 	case ^AstAssignment:
 		operand := EvalAddressOf(statement.operand, names)
 		value := EvalExpression(statement.value, names)
@@ -94,10 +93,7 @@ EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]map[string]Value
 	}
 }
 
-EvalExpression :: proc(
-	expression: AstExpression,
-	names: ^[dynamic]map[string]Value,
-) -> Value {
+EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> Value {
 	switch expression in expression {
 	case ^AstUnary:
 		operand := EvalExpression(expression.operand, names)
@@ -142,51 +138,38 @@ EvalExpression :: proc(
 		return EvalExpression(expression.operand, names).(^Value)^
 	case ^AstCall:
 		operand := EvalExpression(expression.operand, names)
-		switch operand.(Builtin) {
-		case .Type:
+		unimplemented()
+	case ^AstName:
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			switch decl {
+			case .Void:
+				return Type(&DefaultVoidType)
+			case .Type:
+				return Type(&DefaultTypeType)
+			case .Int:
+				return Type(&DefaultIntType)
+			case .Bool:
+				return Type(&DefaultBoolType)
+			case .PrintInt:
+				unimplemented()
+			case .PrintBool:
+				unimplemented()
+			case .Println:
+				unimplemented()
+			case:
+				unreachable()
+			}
+		case ^AstDeclaration:
+			for i := len(names) - 1; i >= 0; i -= 1 {
+				if value, ok := names[i][decl]; ok {
+					return value
+				}
+			}
 			unreachable()
-		case .Int:
-			unreachable()
-		case .Bool:
-			unreachable()
-		case .PrintInt:
-			value := EvalExpression(expression.arguments[0], names)
-			return fmt.print(value.(int))
-		case .PrintBool:
-			value := EvalExpression(expression.arguments[0], names)
-			return fmt.print(value.(bool))
-		case .Println:
-			fmt.println()
-			return nil
 		case:
 			unreachable()
 		}
-	case ^AstName:
-		name := expression.name_token.data.(string)
-		for i := len(names) - 1; i >= 0; i -= 1 {
-			if value, ok := names[i][name]; ok {
-				if builtin, ok := value.(Builtin); ok {
-					switch builtin {
-					case .Type:
-						return Type(&DefaultTypeType)
-					case .Int:
-						return Type(&DefaultIntType)
-					case .Bool:
-						return Type(&DefaultBoolType)
-					case .PrintInt:
-						break
-					case .PrintBool:
-						break
-					case .Println:
-						break
-					case:
-						unreachable()
-					}
-				}
-				return value
-			}
-		}
-		unreachable()
 	case ^AstInteger:
 		return int(expression.integer_token.data.(u128))
 	case:
@@ -194,10 +177,7 @@ EvalExpression :: proc(
 	}
 }
 
-EvalAddressOf :: proc(
-	expression: AstExpression,
-	names: ^[dynamic]map[string]Value,
-) -> ^Value {
+EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> ^Value {
 	switch expression in expression {
 	case ^AstUnary:
 		unreachable()
@@ -210,13 +190,19 @@ EvalAddressOf :: proc(
 	case ^AstDereference:
 		return EvalExpression(expression.operand, names).(^Value)
 	case ^AstName:
-		name := expression.name_token.data.(string)
-		for i := len(names) - 1; i >= 0; i -= 1 {
-			if value, ok := &names[i][name]; ok {
-				return value
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			unreachable()
+		case ^AstDeclaration:
+			for i := len(names) - 1; i >= 0; i -= 1 {
+				if value, ok := &names[i][decl]; ok {
+					return value
+				}
 			}
+			unreachable()
+		case:
+			unreachable()
 		}
-		unreachable()
 	case ^AstInteger:
 		unreachable()
 	case:

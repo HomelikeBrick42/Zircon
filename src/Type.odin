@@ -1,6 +1,7 @@
 package zircon
 
 import "core:fmt"
+import "core:slice"
 
 Type :: union #shared_nil {
 	^TypeVoid,
@@ -24,7 +25,7 @@ TypePointer :: struct {
 }
 
 TypeProcedure :: struct {
-	parameter_types: [dynamic]Type,
+	parameter_types: []Type,
 	return_type:     Type,
 }
 
@@ -85,4 +86,27 @@ GetPointerType :: proc(pointer_to: Type) -> Type {
 		pointer_to = pointer_to,
 	}
 	return &DefaultPointerTypes[pointer_to]
+}
+
+GetProcedureType :: proc(parameter_types: []Type, return_type: Type) -> Type {
+	search_loop: for procedure_type in DefaultProcedureTypes {
+		if procedure_type.return_type != return_type {
+			continue search_loop
+		}
+		if len(procedure_type.parameter_types) != len(parameter_types) {
+			continue search_loop
+		}
+		for parameter_type, i in parameter_types {
+			if procedure_type.parameter_types[i] != parameter_type {
+				continue search_loop
+			}
+		}
+		return procedure_type
+	}
+
+	procedure_type := new(TypeProcedure)
+	procedure_type.parameter_types = slice.clone(parameter_types)
+	procedure_type.return_type = return_type
+	append(&DefaultProcedureTypes, procedure_type)
+	return procedure_type
 }

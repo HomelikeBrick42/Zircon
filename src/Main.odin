@@ -15,7 +15,6 @@ main :: proc() {
 		fmt.eprintf("    show_tokens - prints all of the tokens in the file\n")
 		fmt.eprintf("    show_ast    - prints the ast\n")
 		fmt.eprintf("    check_ast   - type checks the ast\n")
-		fmt.eprintf("    run         - executes the file\n")
 		fmt.eprintf("    emit_c      - emits C code\n")
 		os.exit(1)
 	}
@@ -56,6 +55,7 @@ main :: proc() {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
+
 		names: [dynamic]Scope
 		defer {
 			for scope in names {
@@ -63,65 +63,13 @@ main :: proc() {
 			}
 			delete(names)
 		}
-		append(&names, Scope{"print_int" = Builtin.PrintInt, "println" = Builtin.Println})
+
 		error = ResolveAst(ast, &names)
 		if error, ok := error.?; ok {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
 			os.exit(1)
 		}
 		DumpAst(ast, 0)
-	case "run":
-		ast, error := ParseFile(filepath, source)
-		if error, ok := error.?; ok {
-			fmt.eprintf("%v: %s\n", error.location, error.message)
-			os.exit(1)
-		}
-
-		{
-			names: [dynamic]Scope
-			defer {
-				for scope in names {
-					delete(scope)
-				}
-				delete(names)
-			}
-			append(
-				&names,
-				Scope{
-					"type" = Builtin.Type,
-					"int" = Builtin.Int,
-					"bool" = Builtin.Bool,
-					"print_int" = Builtin.PrintInt,
-					"print_bool" = Builtin.PrintBool,
-					"println" = Builtin.Println,
-				},
-			)
-			error := ResolveAst(ast, &names)
-			if error, ok := error.?; ok {
-				fmt.eprintf("%v: %s\n", error.location, error.message)
-				os.exit(1)
-			}
-		}
-
-		names: [dynamic]map[string]Value
-		defer {
-			for scope in names {
-				delete(scope)
-			}
-			delete(names)
-		}
-		append(
-			&names,
-			map[string]Value{
-				"type" = Builtin.Type,
-				"int" = Builtin.Int,
-				"bool" = Builtin.Bool,
-				"print_int" = Builtin.PrintInt,
-				"print_bool" = Builtin.PrintBool,
-				"println" = Builtin.Println,
-			},
-		)
-		EvalAst(ast, &names)
 	case "emit_c":
 		ast, error := ParseFile(filepath, source)
 		if error, ok := error.?; ok {
@@ -136,17 +84,7 @@ main :: proc() {
 			}
 			delete(names)
 		}
-		append(
-			&names,
-			Scope{
-				"type" = Builtin.Type,
-				"int" = Builtin.Int,
-				"bool" = Builtin.Bool,
-				"print_int" = Builtin.PrintInt,
-				"print_bool" = Builtin.PrintBool,
-				"println" = Builtin.Println,
-			},
-		)
+
 		error = ResolveAst(ast, &names)
 		if error, ok := error.?; ok {
 			fmt.eprintf("%v: %s\n", error.location, error.message)
@@ -155,7 +93,7 @@ main :: proc() {
 
 		buffer := strings.make_builder()
 		defer strings.destroy_builder(&buffer)
-		EmitAst_C(ast, &names, 0, &buffer)
+		EmitAst_C(ast, 0, &buffer)
 
 		if !os.write_entire_file("output.c", transmute([]byte)strings.to_string(buffer)) {
 			fmt.eprintln("Failed to open 'output.c'\n")

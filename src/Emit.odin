@@ -36,41 +36,46 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	case ^TypePointer:
 		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
 	case ^TypeProcedure:
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "Void* %s", name)
+		EmitType_C(type.return_type, fmt.tprintf("(*%s)", name), indent, buffer)
+		fmt.sbprintf(buffer, "(")
+		for parameter_type in type.parameter_types {
+			EmitType_C(parameter_type, "", 0, buffer)
+		}
+		fmt.sbprintf(buffer, ")")
 	case:
 		unreachable()
 	}
 }
 
-EmitDefaultValue :: proc(type: Type, indent: uint, buffer: ^strings.Builder) -> uint {
+EmitDefaultValue :: proc(
+	type: Type,
+	indent: uint,
+	location: SourceLocation,
+	buffer: ^strings.Builder,
+) -> uint {
+	fmt.sbprintf(buffer, "#line %d \"%s\"\n", location.line, location.filepath)
 	PrintIndent(indent, buffer)
 	id := GetID()
 	switch type in type {
 	case ^TypeVoid:
 		unreachable()
 	case ^TypeType:
-		fmt.sbprintf(buffer, "Type _%d = 0;", id)
+		fmt.sbprintf(buffer, "Type _%d = 0;\n", id)
 	case ^TypeInt:
-		fmt.sbprintf(buffer, "Int _%d = 0;", id)
+		fmt.sbprintf(buffer, "Int _%d = 0;\n", id)
 	case ^TypeBool:
-		fmt.sbprintf(buffer, "Bool _%d = 0;", id)
+		fmt.sbprintf(buffer, "Bool _%d = 0;\n", id)
 	case ^TypePointer:
-		fmt.sbprintf(buffer, "Void* _%d = NULL;", id)
+		fmt.sbprintf(buffer, "Void* _%d = NULL;\n", id)
 	case ^TypeProcedure:
-		fmt.sbprintf(buffer, "Void* _%d = NULL;", id)
+		fmt.sbprintf(buffer, "Void* _%d = NULL;\n", id)
 	case:
 		unreachable()
 	}
 	return id
 }
 
-EmitAst_C :: proc(
-	ast: Ast,
-	names: ^[dynamic]Scope,
-	indent: uint,
-	buffer: ^strings.Builder,
-) {
+EmitAst_C :: proc(ast: Ast, indent: uint, buffer: ^strings.Builder) {
 	switch ast in ast {
 	case ^AstFile:
 		fmt.sbprintf(
@@ -82,40 +87,24 @@ typedef size_t Type;
 typedef signed long long Int;
 typedef _Bool Bool;
 
-static char stack[1024 * 1024];
-static char* sp = stack + (1024 * 1024);
+Int _builtin_print_int(Int value) {{
+    return (Int)printf("%%lld", value);
+}}
+
+Int _builtin_print_bool(Bool value) {{
+    return (Int)printf(value ? "true" : "false");
+}}
+
+Void _builtin_println() {{
+    printf("\n");
+}}
 
 int main() {{
-    goto _main;
-    _print_int: {{
-        void* retAddress = *(void**)sp;
-        Int value = *(Int*)(sp + sizeof(void*));
-        Int numCharacters = (Int)printf("%%lld", value);
-        sp -= sizeof(Int);
-        *(Int*)sp = numCharacters;
-        goto *retAddress;
-    }}
-    _print_bool: {{
-        void* retAddress = *(void**)sp;
-        Bool value = *(Bool*)(sp + sizeof(void*));
-        Int numCharacters = (Int)printf(value ? "true" : "false");
-        sp -= sizeof(Int);
-        *(Int*)sp = numCharacters;
-        goto *retAddress;
-    }}
-    _println: {{
-        void* retAddress = *(void**)sp;
-        printf("\n");
-        goto *retAddress;
-    }}
-    _main: {{
 `,
 		)
-		append(names, Scope{})
 		for statement in ast.statements {
-			EmitStatement_C(statement, names, indent + 2, buffer)
+			EmitStatement_C(statement, indent + 1, buffer)
 		}
-		delete(pop(names))
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
@@ -123,23 +112,23 @@ int main() {{
 			ast.end_of_file_token.filepath,
 		)
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, `        return 0;
-    }}
-}}
-`)
+		fmt.sbprintf(buffer, "return 0;\n")
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			ast.end_of_file_token.line,
+			ast.end_of_file_token.filepath,
+		)
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "}}\n")
 	case AstStatement:
-		EmitStatement_C(ast, names, indent, buffer)
+		EmitStatement_C(ast, indent, buffer)
 	case:
 		unreachable()
 	}
 }
 
-EmitStatement_C :: proc(
-	statement: AstStatement,
-	names: ^[dynamic]Scope,
-	indent: uint,
-	buffer: ^strings.Builder,
-) {
+EmitStatement_C :: proc(statement: AstStatement, indent: uint, buffer: ^strings.Builder) {
 	switch statement in statement {
 	case ^AstScope:
 		fmt.sbprintf(
@@ -151,7 +140,7 @@ EmitStatement_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "{{\n")
 		for statement in statement.statements {
-			EmitStatement_C(statement, names, indent + 1, buffer)
+			EmitStatement_C(statement, indent + 1, buffer)
 		}
 		fmt.sbprintf(
 			buffer,
@@ -164,9 +153,14 @@ EmitStatement_C :: proc(
 	case ^AstDeclaration:
 		value: uint
 		if val, ok := statement.value.?; ok {
-			value = EmitExpression_C(val, names, indent, buffer)
+			value = EmitExpression_C(val, indent, buffer)
 		} else {
-			value = EmitDefaultValue(statement.resolved_type, indent, buffer)
+			value = EmitDefaultValue(
+				statement.resolved_type,
+				indent,
+				statement.name_token.location,
+				buffer,
+			)
 		}
 		name := statement.name_token.data.(string)
 		fmt.sbprintf(
@@ -182,10 +176,9 @@ EmitStatement_C :: proc(
 			buffer,
 		)
 		fmt.sbprintf(buffer, " = _%d;\n", value)
-		names[len(names) - 1][name] = statement
 	case ^AstAssignment:
-		operand := EmitAddressOf_C(statement.operand, names, indent, buffer)
-		value := EmitExpression_C(statement.value, names, indent, buffer)
+		operand := EmitAddressOf_C(statement.operand, indent, buffer)
+		value := EmitExpression_C(statement.value, indent, buffer)
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
@@ -195,7 +188,7 @@ EmitStatement_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "*_%d = _%d;\n", operand, value)
 	case ^AstIf:
-		condition := EmitExpression_C(statement.condition, names, indent, buffer)
+		condition := EmitExpression_C(statement.condition, indent, buffer)
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
@@ -204,7 +197,7 @@ EmitStatement_C :: proc(
 		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "if (_%d)\n", condition)
-		EmitStatement_C(statement.then_body, names, indent, buffer)
+		EmitStatement_C(statement.then_body, indent, buffer)
 		if else_body, ok := statement.else_body.?; ok {
 			fmt.sbprintf(
 				buffer,
@@ -214,7 +207,7 @@ EmitStatement_C :: proc(
 			)
 			PrintIndent(indent, buffer)
 			fmt.sbprintf(buffer, "else\n")
-			EmitStatement_C(else_body, names, indent, buffer)
+			EmitStatement_C(else_body, indent, buffer)
 		}
 	case ^AstWhile:
 		fmt.sbprintf(
@@ -233,7 +226,7 @@ EmitStatement_C :: proc(
 		)
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "{{\n")
-		condition := EmitExpression_C(statement.condition, names, indent + 1, buffer)
+		condition := EmitExpression_C(statement.condition, indent + 1, buffer)
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
@@ -242,7 +235,7 @@ EmitStatement_C :: proc(
 		)
 		PrintIndent(indent + 1, buffer)
 		fmt.sbprintf(buffer, "if (!_%d) break;\n", condition)
-		EmitStatement_C(statement.body, names, indent + 1, buffer)
+		EmitStatement_C(statement.body, indent + 1, buffer)
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
@@ -252,7 +245,7 @@ EmitStatement_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "}}\n")
 	case AstExpression:
-		EmitExpression_C(statement, names, indent, buffer)
+		EmitExpression_C(statement, indent, buffer)
 	case:
 		unreachable()
 	}
@@ -260,7 +253,6 @@ EmitStatement_C :: proc(
 
 EmitAddressOf_C :: proc(
 	expression: AstExpression,
-	names: ^[dynamic]Scope,
 	indent: uint,
 	buffer: ^strings.Builder,
 ) -> uint {
@@ -274,36 +266,25 @@ EmitAddressOf_C :: proc(
 	case ^AstAddressOf:
 		unreachable()
 	case ^AstDereference:
-		return EmitExpression_C(expression.operand, names, indent, buffer)
+		return EmitExpression_C(expression.operand, indent, buffer)
 	case ^AstName:
-		name := expression.name_token.data.(string)
-		for i := len(names) - 1; i >= 0; i -= 1 {
-			if decl, ok := names[i][name]; ok {
-				switch decl in decl {
-				case ^AstDeclaration:
-					id := GetID()
-					fmt.sbprintf(
-						buffer,
-						"#line %d \"%s\"\n",
-						expression.name_token.line,
-						expression.name_token.filepath,
-					)
-					EmitType_C(
-						GetPointerType(decl.resolved_type),
-						fmt.tprintf("_%d", id),
-						indent,
-						buffer,
-					)
-					fmt.sbprintf(buffer, " = &_%d;\n", uintptr(decl))
-					return id
-				case Builtin:
-					unreachable()
-				case:
-					unreachable()
-				}
-			}
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			unreachable()
+		case ^AstDeclaration:
+			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			EmitType_C(GetPointerType(decl.resolved_type), fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = &_%d;\n", uintptr(decl))
+			return id
+		case:
+			unreachable()
 		}
-		unreachable()
 	case ^AstInteger:
 		unreachable()
 	case:
@@ -313,13 +294,12 @@ EmitAddressOf_C :: proc(
 
 EmitExpression_C :: proc(
 	expression: AstExpression,
-	names: ^[dynamic]Scope,
 	indent: uint,
 	buffer: ^strings.Builder,
 ) -> uint {
 	switch expression in expression {
 	case ^AstUnary:
-		operand := EmitExpression_C(expression.operand, names, indent, buffer)
+		operand := EmitExpression_C(expression.operand, indent, buffer)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
@@ -362,8 +342,8 @@ EmitExpression_C :: proc(
 			unreachable()
 		}
 	case ^AstBinary:
-		left := EmitExpression_C(expression.left, names, indent, buffer)
-		right := EmitExpression_C(expression.right, names, indent, buffer)
+		left := EmitExpression_C(expression.left, indent, buffer)
+		right := EmitExpression_C(expression.right, indent, buffer)
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
@@ -437,116 +417,38 @@ EmitExpression_C :: proc(
 			unreachable()
 		}
 	case ^AstCall:
-		operand := EmitExpression_C(expression.operand, names, indent, buffer)
+		operand := EmitExpression_C(expression.operand, indent, buffer)
 		ids: [dynamic]uint
 		defer delete(ids)
 		for argument in expression.arguments {
-			append(&ids, EmitExpression_C(argument, names, indent, buffer))
+			append(&ids, EmitExpression_C(argument, indent, buffer))
 		}
-		for id, i in ids {
-			fmt.sbprintf(
-				buffer,
-				"#line %d \"%s\"\n",
-				expression.open_parenthesis_token.line,
-				expression.open_parenthesis_token.filepath,
-			)
-			PrintIndent(indent, buffer)
-			fmt.sbprintf(buffer, "sp -= sizeof(")
-			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
-			fmt.sbprintf(buffer, ");\n")
-			fmt.sbprintf(
-				buffer,
-				"#line %d \"%s\"\n",
-				expression.open_parenthesis_token.line,
-				expression.open_parenthesis_token.filepath,
-			)
-			PrintIndent(indent, buffer)
-			fmt.sbprintf(buffer, "*(")
-			EmitType_C(GetPointerType(GetType(expression.arguments[i])), "", 0, buffer)
-			fmt.sbprintf(buffer, ")sp = _%d;\n", id)
-		}
-		ret_id := GetID()
-		fmt.sbprintf(
-			buffer,
-			"#line %d \"%s\"\n",
-			expression.open_parenthesis_token.line,
-			expression.open_parenthesis_token.filepath,
-		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "sp -= sizeof(void*);\n")
-		fmt.sbprintf(
-			buffer,
-			"#line %d \"%s\"\n",
-			expression.open_parenthesis_token.line,
-			expression.open_parenthesis_token.filepath,
-		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "*(void**)sp = &&_%d;\n", ret_id)
-		fmt.sbprintf(
-			buffer,
-			"#line %d \"%s\"\n",
-			expression.open_parenthesis_token.line,
-			expression.open_parenthesis_token.filepath,
-		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "goto *_%d;\n", operand)
-		fmt.sbprintf(
-			buffer,
-			"#line %d \"%s\"\n",
-			expression.open_parenthesis_token.line,
-			expression.open_parenthesis_token.filepath,
-		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "_%d:\n", ret_id)
 		id := GetID()
-		return_type := GetType(expression.operand).(^TypeProcedure).return_type
-		if _, ok := return_type.(^TypeVoid); !ok {
-			fmt.sbprintf(
-				buffer,
-				"#line %d \"%s\"\n",
-				expression.open_parenthesis_token.line,
-				expression.open_parenthesis_token.filepath,
-			)
-			EmitType_C(return_type, fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, " = *(")
-			EmitType_C(GetPointerType(return_type), "", 0, buffer)
-			fmt.sbprintf(buffer, ")sp;\n")
-			fmt.sbprintf(
-				buffer,
-				"#line %d \"%s\"\n",
-				expression.open_parenthesis_token.line,
-				expression.open_parenthesis_token.filepath,
-			)
-			PrintIndent(indent, buffer)
-			fmt.sbprintf(buffer, "sp += sizeof(")
-			EmitType_C(return_type, "", 0, buffer)
-			fmt.sbprintf(buffer, ");\n")
-		}
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
-			expression.close_parenthesis_token.line,
-			expression.close_parenthesis_token.filepath,
+			expression.open_parenthesis_token.line,
+			expression.open_parenthesis_token.filepath,
 		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "sp += sizeof(void*);\n")
-		for id, i in ids {
-			fmt.sbprintf(
-				buffer,
-				"#line %d \"%s\"\n",
-				expression.close_parenthesis_token.line,
-				expression.close_parenthesis_token.filepath,
-			)
+		if _, ok := GetType(expression).(^TypeVoid); !ok {
+			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = ")
+		} else {
 			PrintIndent(indent, buffer)
-			fmt.sbprintf(buffer, "sp += sizeof(")
-			EmitType_C(GetType(expression.arguments[i]), "", 0, buffer)
-			fmt.sbprintf(buffer, ");\n")
 		}
+		fmt.sbprintf(buffer, "_%d(", operand)
+		for parameter, i in ids {
+			if i > 0 {
+				fmt.sbprintf(buffer, ", ")
+			}
+			fmt.sbprintf(buffer, "_%d", parameter)
+		}
+		fmt.sbprintf(buffer, ");\n")
 		return id
 	case ^AstAddressOf:
-		return EmitAddressOf_C(expression.operand, names, indent, buffer)
+		return EmitAddressOf_C(expression.operand, indent, buffer)
 	case ^AstDereference:
-		operand := EmitExpression_C(expression.operand, names, indent, buffer)
+		operand := EmitExpression_C(expression.operand, indent, buffer)
 		id := GetID()
 		fmt.sbprintf(
 			buffer,
@@ -558,98 +460,103 @@ EmitExpression_C :: proc(
 		fmt.sbprintf(buffer, " = *_%d;\n", operand)
 		return id
 	case ^AstName:
-		name := expression.name_token.data.(string)
-		for i := len(names) - 1; i >= 0; i -= 1 {
-			if decl, ok := names[i][name]; ok {
-				switch decl in decl {
-				case ^AstDeclaration:
-					id := GetID()
-					fmt.sbprintf(
-						buffer,
-						"#line %d \"%s\"\n",
-						expression.name_token.line,
-						expression.name_token.filepath,
-					)
-					EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
-					fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
-					return id
-				case Builtin:
-					switch decl {
-					case .Type:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultTypeType))
-						return id
-					case .Int:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultIntType))
-						return id
-					case .Bool:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "Type _%d = %dull;\n", id, uintptr(&DefaultBoolType))
-						return id
-					case .PrintInt:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "void* _%d = &&_print_int;\n", id)
-						return id
-					case .PrintBool:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "void* _%d = &&_print_bool;\n", id)
-						return id
-					case .Println:
-						id := GetID()
-						fmt.sbprintf(
-							buffer,
-							"#line %d \"%s\"\n",
-							expression.name_token.line,
-							expression.name_token.filepath,
-						)
-						PrintIndent(indent, buffer)
-						fmt.sbprintf(buffer, "void* _%d = &&_println;\n", id)
-						return id
-					case:
-						unreachable()
-					}
-				case:
-					unreachable()
-				}
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			switch decl {
+			case .Void:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultVoidType))
+				return id
+			case .Type:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultTypeType))
+				return id
+			case .Int:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultIntType))
+				return id
+			case .Bool:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultBoolType))
+				return id
+			case .PrintInt:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = &_builtin_print_int;\n")
+				return id
+			case .PrintBool:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = &_builtin_print_bool;\n")
+				return id
+			case .Println:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = &_builtin_println;\n")
+				return id
+			case:
+				unreachable()
 			}
+		case ^AstDeclaration:
+			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
+			return id
+		case:
+			unreachable()
 		}
-		unreachable()
 	case ^AstInteger:
 		value := expression.integer_token.data.(u128)
 		id := GetID()
