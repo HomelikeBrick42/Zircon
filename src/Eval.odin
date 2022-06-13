@@ -149,6 +149,24 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 				return Type(&DefaultTypeType)
 			case .Int:
 				return Type(&DefaultIntType)
+			case .S8:
+				return Type(&DefaultS8Type)
+			case .S16:
+				return Type(&DefaultS16Type)
+			case .S32:
+				return Type(&DefaultS32Type)
+			case .S64:
+				return Type(&DefaultS64Type)
+			case .UInt:
+				return Type(&DefaultUIntType)
+			case .U8:
+				return Type(&DefaultU8Type)
+			case .U16:
+				return Type(&DefaultU16Type)
+			case .U32:
+				return Type(&DefaultU32Type)
+			case .U64:
+				return Type(&DefaultU64Type)
 			case .Bool:
 				return Type(&DefaultBoolType)
 			case .PrintInt:

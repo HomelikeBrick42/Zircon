@@ -16,7 +16,10 @@ TypeVoid :: struct {}
 
 TypeType :: struct {}
 
-TypeInt :: struct {}
+TypeInt :: struct {
+	size:   uint,
+	signed: bool,
+}
 
 TypeBool :: struct {}
 
@@ -46,6 +49,10 @@ DumpType :: proc(type: Type, indent: uint) {
 	case ^TypeInt:
 		PrintIndent(indent)
 		fmt.println("- Int Type")
+		PrintIndent(indent + 1)
+		fmt.println("Size:", type.size)
+		PrintIndent(indent + 1)
+		fmt.println("Signed:", type.signed)
 	case ^TypeBool:
 		PrintIndent(indent)
 		fmt.println("- Bool Type")
@@ -73,7 +80,46 @@ DumpType :: proc(type: Type, indent: uint) {
 
 DefaultVoidType := TypeVoid{}
 DefaultTypeType := TypeType{}
-DefaultIntType := TypeInt{}
+DefaultIntType := TypeInt {
+	size   = 8,
+	signed = true,
+}
+DefaultS8Type := TypeInt {
+	size   = 1,
+	signed = true,
+}
+DefaultS16Type := TypeInt {
+	size   = 2,
+	signed = true,
+}
+DefaultS32Type := TypeInt {
+	size   = 4,
+	signed = true,
+}
+DefaultS64Type := TypeInt {
+	size   = 8,
+	signed = true,
+}
+DefaultUIntType := TypeInt {
+	size   = 8,
+	signed = false,
+}
+DefaultU8Type := TypeInt {
+	size   = 1,
+	signed = false,
+}
+DefaultU16Type := TypeInt {
+	size   = 2,
+	signed = false,
+}
+DefaultU32Type := TypeInt {
+	size   = 4,
+	signed = false,
+}
+DefaultU64Type := TypeInt {
+	size   = 8,
+	signed = false,
+}
 DefaultBoolType := TypeBool{}
 DefaultPointerTypes := make(map[Type]TypePointer)
 DefaultProcedureTypes := make([dynamic]^TypeProcedure)

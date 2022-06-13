@@ -6,6 +6,15 @@ Builtin :: enum {
 	Void,
 	Type,
 	Int,
+	S8,
+	S16,
+	S32,
+	S64,
+	UInt,
+	U8,
+	U16,
+	U32,
+	U64,
 	Bool,
 	PrintInt,
 	PrintBool,
@@ -21,7 +30,7 @@ GetDeclType :: proc(decl: Decl) -> Type {
 	switch decl in decl {
 	case Builtin:
 		switch decl {
-		case .Void, .Type, .Int, .Bool:
+		case .Void, .Type, .Int, .S8, .S16, .S32, .S64, .UInt, .U8, .U16, .U32, .U64, .Bool:
 			return &DefaultTypeType
 		case .PrintInt:
 			return GetProcedureType({Type(&DefaultIntType)}, &DefaultIntType)
@@ -404,6 +413,33 @@ ResolveExpression :: proc(
 			return nil
 		case "int":
 			expression.resolved_decl = Builtin.Int
+			return nil
+		case "s8":
+			expression.resolved_decl = Builtin.S8
+			return nil
+		case "s16":
+			expression.resolved_decl = Builtin.S16
+			return nil
+		case "s32":
+			expression.resolved_decl = Builtin.S32
+			return nil
+		case "s64":
+			expression.resolved_decl = Builtin.S64
+			return nil
+		case "uint":
+			expression.resolved_decl = Builtin.UInt
+			return nil
+		case "u8":
+			expression.resolved_decl = Builtin.U8
+			return nil
+		case "u16":
+			expression.resolved_decl = Builtin.U16
+			return nil
+		case "u32":
+			expression.resolved_decl = Builtin.U32
+			return nil
+		case "u64":
+			expression.resolved_decl = Builtin.U64
 			return nil
 		case "bool":
 			expression.resolved_decl = Builtin.Bool

@@ -23,16 +23,16 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	switch type in type {
 	case ^TypeVoid:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "Void %s", name)
+		fmt.sbprintf(buffer, "void %s", name)
 	case ^TypeType:
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "Type %s", name)
 	case ^TypeInt:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "Int %s", name)
+		fmt.sbprintf(buffer, "%sint%d_t %s", !type.signed ? "u" : "", type.size * 8, name)
 	case ^TypeBool:
 		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "Bool %s", name)
+		fmt.sbprintf(buffer, "bool %s", name)
 	case ^TypePointer:
 		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
 	case ^TypeProcedure:
@@ -54,21 +54,21 @@ EmitDefaultValue :: proc(
 	buffer: ^strings.Builder,
 ) -> uint {
 	fmt.sbprintf(buffer, "#line %d \"%s\"\n", location.line, location.filepath)
-	PrintIndent(indent, buffer)
 	id := GetID()
+	EmitType_C(type, fmt.tprintf("_%d", id), indent, buffer)
 	switch type in type {
 	case ^TypeVoid:
 		unreachable()
 	case ^TypeType:
-		fmt.sbprintf(buffer, "Type _%d = 0;\n", id)
+		fmt.sbprintf(buffer, " = 0;\n")
 	case ^TypeInt:
-		fmt.sbprintf(buffer, "Int _%d = 0;\n", id)
+		fmt.sbprintf(buffer, " = 0;\n")
 	case ^TypeBool:
-		fmt.sbprintf(buffer, "Bool _%d = 0;\n", id)
+		fmt.sbprintf(buffer, " = false;\n")
 	case ^TypePointer:
-		fmt.sbprintf(buffer, "Void* _%d = NULL;\n", id)
+		fmt.sbprintf(buffer, " = NULL;\n")
 	case ^TypeProcedure:
-		fmt.sbprintf(buffer, "Void* _%d = NULL;\n", id)
+		fmt.sbprintf(buffer, " = NULL;\n")
 	case:
 		unreachable()
 	}
@@ -81,32 +81,31 @@ EmitAst_C :: proc(ast: Ast, indent: uint, buffer: ^strings.Builder) {
 		fmt.sbprintf(
 			buffer,
 			`#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-typedef void Void;
-typedef size_t Type;
-typedef signed long long Int;
-typedef _Bool Bool;
+typedef uint64_t Type;
 
-static Void _builtin_main(void);
+static void _builtin_main(void);
 
 int main(int argc, char** argv) {{
     _builtin_main();
     return 0;
 }}
 
-static Int _builtin_print_int(Int value) {{
-    return (Int)printf("%%lld", value);
+static int64_t _builtin_print_int(int64_t value) {{
+    return (int64_t)printf("%%lld", value);
 }}
 
-static Int _builtin_print_bool(Bool value) {{
-    return (Int)printf(value ? "true" : "false");
+static int64_t _builtin_print_bool(bool value) {{
+    return (int64_t)printf(value ? "true" : "false");
 }}
 
-static Void _builtin_println(void) {{
+static void _builtin_println(void) {{
     printf("\n");
 }}
 
-static Void _builtin_main(void) {{
+static void _builtin_main(void) {{
 `,
 		)
 		for statement in ast.statements {
@@ -494,6 +493,105 @@ EmitExpression_C :: proc(
 				)
 				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
 				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultIntType))
+				return id
+			case .S8:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultS8Type))
+				return id
+			case .S16:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultS16Type))
+				return id
+			case .S32:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultS32Type))
+				return id
+			case .S64:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultS64Type))
+				return id
+			case .UInt:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultUIntType))
+				return id
+			case .U8:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultU8Type))
+				return id
+			case .U16:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultU16Type))
+				return id
+			case .U32:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultU32Type))
+				return id
+			case .U64:
+				id := GetID()
+				fmt.sbprintf(
+					buffer,
+					"#line %d \"%s\"\n",
+					expression.name_token.line,
+					expression.name_token.filepath,
+				)
+				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultU64Type))
 				return id
 			case .Bool:
 				id := GetID()
