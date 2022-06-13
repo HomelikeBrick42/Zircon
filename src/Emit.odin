@@ -87,32 +87,31 @@ typedef size_t Type;
 typedef signed long long Int;
 typedef _Bool Bool;
 
-Int _builtin_print_int(Int value) {{
+static Void _builtin_main(void);
+
+int main(int argc, char** argv) {{
+    _builtin_main();
+    return 0;
+}}
+
+static Int _builtin_print_int(Int value) {{
     return (Int)printf("%%lld", value);
 }}
 
-Int _builtin_print_bool(Bool value) {{
+static Int _builtin_print_bool(Bool value) {{
     return (Int)printf(value ? "true" : "false");
 }}
 
-Void _builtin_println() {{
+static Void _builtin_println(void) {{
     printf("\n");
 }}
 
-int main() {{
+static Void _builtin_main(void) {{
 `,
 		)
 		for statement in ast.statements {
 			EmitStatement_C(statement, indent + 1, buffer)
 		}
-		fmt.sbprintf(
-			buffer,
-			"#line %d \"%s\"\n",
-			ast.end_of_file_token.line,
-			ast.end_of_file_token.filepath,
-		)
-		PrintIndent(indent, buffer)
-		fmt.sbprintf(buffer, "return 0;\n")
 		fmt.sbprintf(
 			buffer,
 			"#line %d \"%s\"\n",
