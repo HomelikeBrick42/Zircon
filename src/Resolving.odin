@@ -60,6 +60,20 @@ ExpectType :: proc(type: Type, expected: Type, location: SourceLocation) -> Mayb
 	return nil
 }
 
+ExpectTypeKind :: proc(
+	type: Type,
+	$expected_kind: typeid,
+	location: SourceLocation,
+) -> Maybe(Error) {
+	if _, ok := type.(^expected_kind); !ok {
+		return Error{
+			location = location,
+			message = fmt.aprintf("Expected %v, but got type %v", typeid_of(expected_kind), type),
+		}
+	}
+	return nil
+}
+
 ResolveAst :: proc(ast: Ast, names: ^[dynamic]Scope) -> Maybe(Error) {
 	switch ast in ast {
 	case ^AstFile:
@@ -90,14 +104,14 @@ ResolveStatement :: proc(
 		return nil
 	case ^AstDeclaration:
 		if type, ok := statement.type.?; ok {
-			ResolveExpression(type, names) or_return
+			ResolveExpression(type, names, &DefaultTypeType) or_return
 			if !IsConstant(type) {
 				return Error{
 					location = statement.name_token.location,
 					message = fmt.aprintf("Declaration type must be a constant"),
 				}
 			}
-			ExpectType(GetType(type), &DefaultTypeType, statement.colon_token.location) or_return
+			ExpectTypeKind(GetType(type), TypeType, statement.colon_token.location) or_return
 
 			names: [dynamic]EvalScope
 			defer {
@@ -109,7 +123,7 @@ ResolveStatement :: proc(
 			statement.resolved_type = EvalExpression(type, &names).(Type)
 		}
 		if value, ok := statement.value.?; ok {
-			ResolveExpression(value, names) or_return
+			ResolveExpression(value, names, statement.resolved_type) or_return
 			if statement.resolved_type != nil {
 				ExpectType(
 					statement.resolved_type,
@@ -131,30 +145,25 @@ ResolveStatement :: proc(
 		scope[name] = statement
 		return nil
 	case ^AstAssignment:
-		ResolveExpression(statement.operand, names) or_return
+		ResolveExpression(statement.operand, names, nil) or_return
 		if !IsAddressable(statement.operand) {
 			return Error{
 				location = statement.equal_token.location,
 				message = fmt.aprintf("Expression is not assignable"),
 			}
 		}
-		ResolveExpression(statement.value, names) or_return
-		if GetType(statement.operand) != GetType(statement.value) {
-			return Error{
-				location = statement.equal_token.location,
-				message = fmt.aprintf(
-					"Cannot assign type %v to type %v",
-					GetType(statement.value),
-					GetType(statement.operand),
-				),
-			}
-		}
+		ResolveExpression(statement.value, names, GetType(statement.operand)) or_return
+		ExpectType(
+			GetType(statement.value),
+			GetType(statement.operand),
+			statement.equal_token.location,
+		) or_return
 		return nil
 	case ^AstIf:
-		ResolveExpression(statement.condition, names) or_return
-		ExpectType(
+		ResolveExpression(statement.condition, names, &DefaultBoolType) or_return
+		ExpectTypeKind(
 			GetType(statement.condition),
-			&DefaultBoolType,
+			TypeBool,
 			statement.if_token.location,
 		) or_return
 		ResolveStatement(statement.then_body, names) or_return
@@ -163,16 +172,16 @@ ResolveStatement :: proc(
 		}
 		return nil
 	case ^AstWhile:
-		ResolveExpression(statement.condition, names) or_return
-		ExpectType(
+		ResolveExpression(statement.condition, names, &DefaultBoolType) or_return
+		ExpectTypeKind(
 			GetType(statement.condition),
-			&DefaultBoolType,
+			TypeBool,
 			statement.while_token.location,
 		) or_return
 		ResolveStatement(statement.body, names) or_return
 		return nil
 	case AstExpression:
-		return ResolveExpression(statement, names)
+		return ResolveExpression(statement, names, nil)
 	case:
 		unreachable()
 	}
@@ -225,17 +234,18 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 ResolveExpression :: proc(
 	expression: AstExpression,
 	names: ^[dynamic]Scope,
+	suggested_type: Type,
 ) -> Maybe(Error) {
 	switch expression in expression {
 	case ^AstUnary:
-		ResolveExpression(expression.operand, names) or_return
+		ResolveExpression(expression.operand, names, suggested_type) or_return
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Pointer:
-			ExpectType(
+			ExpectTypeKind(
 				GetType(expression.operand),
-				&DefaultTypeType,
+				TypeType,
 				expression.operator_token,
 			) or_return
 			if !IsConstant(expression.operand) {
@@ -247,25 +257,31 @@ ResolveExpression :: proc(
 			expression.type = GetType(expression.operand)
 			return nil
 		case .Identity:
-			ExpectType(
+			ExpectTypeKind(
 				GetType(expression.operand),
-				&DefaultIntType,
+				TypeInt,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.operand)
 			return nil
 		case .Negation:
-			ExpectType(
+			ExpectTypeKind(
 				GetType(expression.operand),
-				&DefaultIntType,
+				TypeInt,
 				expression.operator_token,
 			) or_return
+			if !GetType(expression.operand).(^TypeInt).signed {
+				return Error{
+					location = expression.operator_token.location,
+					message = fmt.aprintf("Cannot negate an unsigned integer"),
+				}
+			}
 			expression.type = GetType(expression.operand)
 			return nil
 		case .LogicalNot:
-			ExpectType(
+			ExpectTypeKind(
 				GetType(expression.operand),
-				&DefaultBoolType,
+				TypeBool,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.operand)
@@ -274,75 +290,63 @@ ResolveExpression :: proc(
 			unreachable()
 		}
 	case ^AstBinary:
-		ResolveExpression(expression.left, names) or_return
-		ResolveExpression(expression.right, names) or_return
+		ResolveExpression(expression.left, names, suggested_type) or_return
+		ResolveExpression(expression.right, names, GetType(expression.left)) or_return
 		switch expression.operator_kind {
 		case .Invalid:
 			unreachable()
 		case .Addition:
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
 			ExpectType(
+				GetType(expression.right),
 				GetType(expression.left),
-				&DefaultIntType,
-				expression.operator_token,
-			) or_return
-			ExpectType(
-				GetType(expression.left),
-				&DefaultIntType,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Subtraction:
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
 			ExpectType(
+				GetType(expression.right),
 				GetType(expression.left),
-				&DefaultIntType,
-				expression.operator_token,
-			) or_return
-			ExpectType(
-				GetType(expression.left),
-				&DefaultIntType,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Multiplication:
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
 			ExpectType(
+				GetType(expression.right),
 				GetType(expression.left),
-				&DefaultIntType,
-				expression.operator_token,
-			) or_return
-			ExpectType(
-				GetType(expression.left),
-				&DefaultIntType,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Division:
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
+			ExpectTypeKind(GetType(expression.left), TypeInt, expression.operator_token) or_return
 			ExpectType(
+				GetType(expression.right),
 				GetType(expression.left),
-				&DefaultIntType,
-				expression.operator_token,
-			) or_return
-			ExpectType(
-				GetType(expression.left),
-				&DefaultIntType,
 				expression.operator_token,
 			) or_return
 			expression.type = GetType(expression.left)
 			return nil
 		case .Equal:
 			ExpectType(
-				GetType(expression.left),
 				GetType(expression.right),
+				GetType(expression.left),
 				expression.operator_token.location,
 			) or_return
 			expression.type = &DefaultBoolType
 			return nil
 		case .NotEqual:
 			ExpectType(
-				GetType(expression.left),
 				GetType(expression.right),
+				GetType(expression.left),
 				expression.operator_token.location,
 			) or_return
 			expression.type = &DefaultBoolType
@@ -351,14 +355,13 @@ ResolveExpression :: proc(
 			unreachable()
 		}
 	case ^AstCall:
-		ResolveExpression(expression.operand, names) or_return
-		procedure_type, ok := GetType(expression.operand).(^TypeProcedure)
-		if !ok {
-			return Error{
-				location = expression.open_parenthesis_token.location,
-				message = fmt.aprintf("Cannot call a %v", Type(procedure_type)),
-			}
-		}
+		ResolveExpression(expression.operand, names, nil) or_return
+		ExpectTypeKind(
+			GetType(expression.operand),
+			TypeProcedure,
+			expression.open_parenthesis_token.location,
+		) or_return
+		procedure_type := GetType(expression.operand).(^TypeProcedure)
 		if len(procedure_type.parameter_types) != len(expression.arguments) {
 			return Error{
 				location = expression.close_parenthesis_token.location,
@@ -370,7 +373,7 @@ ResolveExpression :: proc(
 			}
 		}
 		for argument, i in expression.arguments {
-			ResolveExpression(argument, names) or_return
+			ResolveExpression(argument, names, procedure_type.parameter_types[i]) or_return
 			ExpectType(
 				GetType(argument),
 				procedure_type.parameter_types[i],
@@ -379,7 +382,7 @@ ResolveExpression :: proc(
 		}
 		return nil
 	case ^AstAddressOf:
-		ResolveExpression(expression.operand, names) or_return
+		ResolveExpression(expression.operand, names, nil) or_return
 		if !IsAddressable(expression.operand) {
 			return Error{
 				location = expression.caret_token.location,
@@ -388,13 +391,12 @@ ResolveExpression :: proc(
 		}
 		return nil
 	case ^AstDereference:
-		ResolveExpression(expression.operand, names) or_return
-		if _, ok := GetType(expression.operand).(^TypePointer); !ok {
-			return Error{
-				location = expression.caret_token.location,
-				message = fmt.aprintf("Cannot dereference a %v", GetType(expression.operand)),
-			}
-		}
+		ResolveExpression(expression.operand, names, nil) or_return
+		ExpectTypeKind(
+			GetType(expression.operand),
+			TypePointer,
+			expression.caret_token.location,
+		) or_return
 		return nil
 	case ^AstName:
 		name := expression.name_token.data.(string)
@@ -460,12 +462,78 @@ ResolveExpression :: proc(
 			}
 		}
 	case ^AstInteger:
-		expression.type = &DefaultIntType
+		if type, ok := suggested_type.(^TypeInt); ok {
+			expression.type = type
+		} else {
+			expression.type = &DefaultIntType
+		}
 		value := expression.integer_token.data.(u128)
-		if value >= cast(u128)max(int) {
-			return Error{
-				location = expression.integer_token.location,
-				message = fmt.aprintf("%d is too big for an int", value),
+		type := GetType(expression).(^TypeInt)
+		if type.signed {
+			switch type.size {
+			case 1:
+				if value >= cast(u128)max(i8) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 2:
+				if value >= cast(u128)max(i16) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 4:
+				if value >= cast(u128)max(i32) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 8:
+				if value >= cast(u128)max(i64) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case:
+				unreachable()
+			}
+		} else {
+			switch type.size {
+			case 1:
+				if value >= cast(u128)max(u8) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 2:
+				if value >= cast(u128)max(u16) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 4:
+				if value >= cast(u128)max(u32) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case 8:
+				if value >= cast(u128)max(u64) {
+					return Error{
+						location = expression.integer_token.location,
+						message = fmt.aprintf("%d is too big for %v", expression.type),
+					}
+				}
+			case:
+				unreachable()
 			}
 		}
 		return nil

@@ -12,6 +12,15 @@ Value :: union {
 	Type,
 	^Value,
 	int,
+	i8,
+	i16,
+	i32,
+	i64,
+	uint,
+	u8,
+	u16,
+	u32,
+	u64,
 	bool,
 	BuiltinProcedure,
 }
@@ -25,7 +34,33 @@ GetDefaultValue :: proc(type: Type) -> Value {
 	case ^TypeType:
 		return Type(nil)
 	case ^TypeInt:
-		return 0
+		if type.signed {
+			switch type.size {
+			case 1:
+				return i8(0)
+			case 2:
+				return i16(0)
+			case 4:
+				return i32(0)
+			case 8:
+				return i64(0)
+			case:
+				unreachable()
+			}
+		} else {
+			switch type.size {
+			case 1:
+				return u8(0)
+			case 2:
+				return u16(0)
+			case 4:
+				return u32(0)
+			case 8:
+				return u64(0)
+			case:
+				unreachable()
+			}
+		}
 	case ^TypeBool:
 		return false
 	case ^TypePointer:
@@ -189,7 +224,34 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 			unreachable()
 		}
 	case ^AstInteger:
-		return int(expression.integer_token.data.(u128))
+        type := GetType(expression).(^TypeInt)
+		if type.signed {
+			switch type.size {
+			case 1:
+				return i8(expression.integer_token.data.(u128))
+			case 2:
+				return i16(expression.integer_token.data.(u128))
+			case 4:
+				return i32(expression.integer_token.data.(u128))
+			case 8:
+				return i64(expression.integer_token.data.(u128))
+			case:
+				unreachable()
+			}
+		} else {
+			switch type.size {
+			case 1:
+				return u8(expression.integer_token.data.(u128))
+			case 2:
+				return u16(expression.integer_token.data.(u128))
+			case 4:
+				return u32(expression.integer_token.data.(u128))
+			case 8:
+				return u64(expression.integer_token.data.(u128))
+			case:
+				unreachable()
+			}
+		}
 	case:
 		unreachable()
 	}
