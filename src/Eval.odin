@@ -2,15 +2,10 @@ package zircon
 
 import "core:fmt"
 
-BuiltinProcedure :: enum {
-	PrintInt,
-	PrintBool,
-	Println,
-}
-
 Value :: union {
 	Type,
 	^Value,
+	[]Value,
 	int,
 	i8,
 	i16,
@@ -22,7 +17,6 @@ Value :: union {
 	u32,
 	u64,
 	bool,
-	BuiltinProcedure,
 }
 
 EvalScope :: map[^AstDeclaration]Value
@@ -67,6 +61,8 @@ GetDefaultValue :: proc(type: Type) -> Value {
 		return (^Value)(nil)
 	case ^TypeProcedure:
 		return nil
+	case ^TypeArray:
+		return []Value{}
 	case:
 		unreachable()
 	}
@@ -130,6 +126,48 @@ EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]EvalScope) {
 	}
 }
 
+Value_Equal :: proc(left: Value, right: Value) -> bool {
+	switch left in left {
+	case Type:
+		return left == right.(Type)
+	case ^Value:
+		return left == right.(^Value)
+	case []Value:
+		right := right.([]Value)
+		if len(left) != len(right) do return false
+		for left, i in left {
+			if !Value_Equal(left, right[i]) {
+				return false
+			}
+		}
+		return true
+	case int:
+		return left == right.(int)
+	case i8:
+		return left == right.(i8)
+	case i16:
+		return left == right.(i16)
+	case i32:
+		return left == right.(i32)
+	case i64:
+		return left == right.(i64)
+	case uint:
+		return left == right.(uint)
+	case u8:
+		return left == right.(u8)
+	case u16:
+		return left == right.(u16)
+	case u32:
+		return left == right.(u32)
+	case u64:
+		return left == right.(u64)
+	case bool:
+		return left == right.(bool)
+	case:
+		unreachable()
+	}
+}
+
 EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> Value {
 	switch expression in expression {
 	case ^AstUnary:
@@ -163,9 +201,9 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		case .Division:
 			return left.(int) / right.(int)
 		case .Equal:
-			return left == right
+			return Value_Equal(left, right)
 		case .NotEqual:
-			return left != right
+			return !Value_Equal(left, right)
 		case:
 			unreachable()
 		}
@@ -261,6 +299,8 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		} else {
 			unimplemented()
 		}
+	case ^AstArray:
+		return GetArrayType(expression.resolved_inner_type, expression.resolved_length)
 	case:
 		unreachable()
 	}
@@ -297,6 +337,8 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 	case ^AstInteger:
 		unreachable()
 	case ^AstProcedure:
+		unreachable()
+	case ^AstArray:
 		unreachable()
 	case:
 		unreachable()

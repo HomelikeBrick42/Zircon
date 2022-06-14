@@ -26,6 +26,7 @@ AstExpression :: union #shared_nil {
 	^AstName,
 	^AstInteger,
 	^AstProcedure,
+	^AstArray,
 }
 
 AstFile :: struct {
@@ -152,6 +153,16 @@ AstProcedure :: struct {
 	), // TODO: make this a calculated string value, so it could be computed from other constants at compile time
 }
 
+AstArray :: struct {
+	type:                       Type,
+	open_square_bracket_token:  Token,
+	length:                     AstExpression,
+	resolved_length:            uint,
+	close_square_bracket_token: Token,
+	inner_type:                 AstExpression,
+	resolved_inner_type:        Type,
+}
+
 GetType :: proc(expression: AstExpression) -> Type {
 	switch expression in expression {
 	case ^AstUnary:
@@ -169,6 +180,8 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstInteger:
 		return expression.type
 	case ^AstProcedure:
+		return expression.type
+	case ^AstArray:
 		return expression.type
 	case:
 		unreachable()
@@ -333,6 +346,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				PrintIndent(indent + 1)
 				fmt.println("Value:", ast.integer_token.data.(u128))
 			case ^AstProcedure:
+				unimplemented()
+			case ^AstArray:
 				unimplemented()
 			case:
 				unreachable()

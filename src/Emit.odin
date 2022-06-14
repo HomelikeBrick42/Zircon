@@ -52,6 +52,8 @@ EmitType_C :: proc(
 			EmitType_C(parameter_type, "", 0, buffer)
 		}
 		fmt.sbprintf(buffer, ")")
+	case ^TypeArray:
+		EmitType_C(type.inner_type, fmt.tprintf("(%s[%d])", name), indent, buffer)
 	case:
 		unreachable()
 	}
@@ -79,6 +81,8 @@ EmitDefaultValue :: proc(
 		fmt.sbprintf(buffer, " = NULL;\n")
 	case ^TypeProcedure:
 		fmt.sbprintf(buffer, " = NULL;\n")
+	case ^TypeArray:
+		fmt.sbprintf(buffer, " = {};\n")
 	case:
 		unreachable()
 	}
@@ -155,6 +159,9 @@ CollectAllExterns :: proc(ast: Ast, externs: ^map[Extern]bool) {
 			if _, ok := expression.extern_token.?; ok {
 				externs[expression] = true
 			}
+		case ^AstArray:
+			CollectAllExternsExpression(expression.length, externs)
+			CollectAllExternsExpression(expression.inner_type, externs)
 		case:
 			unreachable()
 		}
@@ -404,6 +411,8 @@ EmitAddressOf_C :: proc(
 	case ^AstInteger:
 		unreachable()
 	case ^AstProcedure:
+		unreachable()
+	case ^AstArray:
 		unreachable()
 	case:
 		unreachable()
@@ -789,6 +798,17 @@ EmitExpression_C :: proc(
 			fmt.sbprintf(buffer, " = &%s;\n", name)
 			return id
 		}
+	case ^AstArray:
+		id := GetID()
+		fmt.sbprintf(
+			buffer,
+			"#line %d \"%s\"\n",
+			expression.open_square_bracket_token.line,
+			expression.open_square_bracket_token.filepath,
+		)
+		EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
+		fmt.sbprintf(buffer, " = %d;\n", uintptr(expression.type.(^TypeArray)))
+		return id
 	case:
 		unreachable()
 	}

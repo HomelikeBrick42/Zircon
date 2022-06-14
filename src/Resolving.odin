@@ -245,6 +245,8 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		return false
 	case ^AstProcedure:
 		return false
+	case ^AstArray:
+		return false
 	case:
 		unreachable()
 	}
@@ -278,6 +280,8 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 	case ^AstProcedure:
 		_, ok := expression.type.(^TypeType)
 		return ok
+	case ^AstArray:
+		return true
 	case:
 		unreachable()
 	}
@@ -627,6 +631,10 @@ ResolveExpression :: proc(
 		}
 
 		return nil
+	case ^AstArray:
+		ResolveExpression(expression.length, names, &DefaultIntType) or_return
+		ResolveExpression(expression.inner_type, names, &DefaultTypeType) or_return
+		unimplemented()
 	case:
 		unreachable()
 	}

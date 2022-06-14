@@ -10,6 +10,7 @@ Type :: union #shared_nil {
 	^TypeBool,
 	^TypePointer,
 	^TypeProcedure,
+	^TypeArray,
 }
 
 TypeVoid :: struct {}
@@ -30,6 +31,11 @@ TypePointer :: struct {
 TypeProcedure :: struct {
 	parameter_types: []Type,
 	return_type:     Type,
+}
+
+TypeArray :: struct {
+	inner_type: Type,
+	length:     uint,
 }
 
 DumpType :: proc(type: Type, indent: uint) {
@@ -73,6 +79,12 @@ DumpType :: proc(type: Type, indent: uint) {
 		PrintIndent(indent + 1)
 		fmt.println("Return Type:")
 		DumpType(type.return_type, indent + 2)
+	case ^TypeArray:
+		PrintIndent(indent)
+		fmt.println("- Array Type")
+		PrintIndent(indent + 1)
+		fmt.println("Inner Type:")
+		DumpType(type.inner_type, indent + 2)
 	case:
 		unreachable()
 	}
@@ -123,6 +135,7 @@ DefaultU64Type := TypeInt {
 DefaultBoolType := TypeBool{}
 DefaultPointerTypes := make(map[Type]TypePointer)
 DefaultProcedureTypes := make([dynamic]^TypeProcedure)
+DefaultArrayTypes := make(map[Type]map[uint]TypeArray)
 
 GetPointerType :: proc(pointer_to: Type) -> Type {
 	if type, ok := &DefaultPointerTypes[pointer_to]; ok {
@@ -155,4 +168,17 @@ GetProcedureType :: proc(parameter_types: []Type, return_type: Type) -> Type {
 	procedure_type.return_type = return_type
 	append(&DefaultProcedureTypes, procedure_type)
 	return procedure_type
+}
+
+GetArrayType :: proc(inner_type: Type, length: uint) -> Type {
+	if array, ok := &DefaultArrayTypes[inner_type]; ok {
+		if type, ok := &array[length]; ok {
+			return type
+		}
+	}
+	array := &DefaultArrayTypes[inner_type]
+	array[length] = TypeArray {
+		inner_type = inner_type,
+	}
+	return &DefaultArrayTypes[inner_type][length]
 }

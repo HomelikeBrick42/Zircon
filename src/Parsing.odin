@@ -141,6 +141,13 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		integer := new(AstInteger)
 		integer.integer_token = Lexer_ExpectToken(lexer, .Integer) or_return
 		return integer, nil
+	case .OpenSquareBracket:
+		array := new(AstArray)
+		array.open_square_bracket_token = Lexer_ExpectToken(lexer, .OpenSquareBracket) or_return
+		array.length = ParseExpression(lexer) or_return
+		array.close_square_bracket_token = Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
+		array.inner_type = ParseExpression(lexer) or_return
+		return array, nil
 	case:
 		token := Lexer_NextToken(lexer) or_return
 		error = Error {
