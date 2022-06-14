@@ -1,5 +1,7 @@
 putchar := proc(char: s32) -> s32 #extern "putchar"
 
+array: [5]int
+
 char: s32 = 65
 while char != 91 {
     putchar(char)

@@ -634,7 +634,26 @@ ResolveExpression :: proc(
 	case ^AstArray:
 		ResolveExpression(expression.length, names, &DefaultIntType) or_return
 		ResolveExpression(expression.inner_type, names, &DefaultTypeType) or_return
-		unimplemented()
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			expression.resolved_length = uint(EvalExpression(expression.length, &names).(i64))
+			expression.resolved_inner_type = EvalExpression(expression.inner_type, &names).(Type)
+		}
+
+		if type, ok := suggested_type.(^TypeType); ok {
+			expression.type = type
+		} else {
+			expression.type = &DefaultTypeType
+		}
+
+		return nil
 	case:
 		unreachable()
 	}

@@ -176,9 +176,16 @@ GetArrayType :: proc(inner_type: Type, length: uint) -> Type {
 			return type
 		}
 	}
-	array := &DefaultArrayTypes[inner_type]
+	array: ^map[uint]TypeArray
+	if a, ok := &DefaultArrayTypes[inner_type]; ok {
+		array = a
+	} else {
+		DefaultArrayTypes[inner_type] = {}
+		array = &DefaultArrayTypes[inner_type]
+	}
 	array[length] = TypeArray {
 		inner_type = inner_type,
+		length     = length,
 	}
 	return &DefaultArrayTypes[inner_type][length]
 }

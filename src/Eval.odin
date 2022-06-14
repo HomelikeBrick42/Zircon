@@ -6,12 +6,10 @@ Value :: union {
 	Type,
 	^Value,
 	[]Value,
-	int,
 	i8,
 	i16,
 	i32,
 	i64,
-	uint,
 	u8,
 	u16,
 	u32,
@@ -141,8 +139,6 @@ Value_Equal :: proc(left: Value, right: Value) -> bool {
 			}
 		}
 		return true
-	case int:
-		return left == right.(int)
 	case i8:
 		return left == right.(i8)
 	case i16:
@@ -151,8 +147,6 @@ Value_Equal :: proc(left: Value, right: Value) -> bool {
 		return left == right.(i32)
 	case i64:
 		return left == right.(i64)
-	case uint:
-		return left == right.(uint)
 	case u8:
 		return left == right.(u8)
 	case u16:
@@ -178,9 +172,9 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		case .Pointer:
 			return GetPointerType(operand.(Type))
 		case .Identity:
-			return +operand.(int)
+			return +operand.(i64)
 		case .Negation:
-			return -operand.(int)
+			return -operand.(i64)
 		case .LogicalNot:
 			return !operand.(bool)
 		case:
@@ -193,13 +187,13 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		case .Invalid:
 			unreachable()
 		case .Addition:
-			return left.(int) + right.(int)
+			return left.(i64) + right.(i64)
 		case .Subtraction:
-			return left.(int) - right.(int)
+			return left.(i64) - right.(i64)
 		case .Multiplication:
-			return left.(int) * right.(int)
+			return left.(i64) * right.(i64)
 		case .Division:
-			return left.(int) / right.(int)
+			return left.(i64) / right.(i64)
 		case .Equal:
 			return Value_Equal(left, right)
 		case .NotEqual:
