@@ -3,6 +3,7 @@ package zircon
 import "core:fmt"
 import "core:strings"
 import "core:unicode"
+import "core:unicode/utf8"
 
 Lexer :: struct {
 	using location: SourceLocation,
@@ -70,6 +71,32 @@ Lexer_NextToken :: proc(lexer: ^Lexer) -> (token: Token, error: Maybe(Error)) {
 				message  = fmt.aprintf("Unknown directive #%s", name),
 			}
 			return {}, error
+		}
+
+		if Lexer_CurrentChar(lexer^) == '"' {
+			Lexer_NextChar(lexer)
+
+			value: [dynamic]rune
+			defer delete(value)
+			for Lexer_CurrentChar(lexer^) != '"' {
+				chr := Lexer_NextChar(lexer)
+				if chr == 0 {
+					error = Error {
+						location = start_location,
+						message  = fmt.aprintf("Unclosed string literal"),
+					}
+					return {}, error
+				}
+				append(&value, chr)
+			}
+
+			assert(Lexer_NextChar(lexer) == '"')
+			return Token{
+				kind = .String,
+				location = start_location,
+				length = lexer.position - start_location.position,
+				data = utf8.runes_to_string(value[:]),
+			}, nil
 		}
 
 		if unicode.is_alpha(Lexer_CurrentChar(lexer^)) || Lexer_CurrentChar(lexer^) == '_' {

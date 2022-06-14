@@ -1,4 +1,4 @@
-#extern putchar: proc(char: s32) -> s32
+putchar := proc(char: s32) -> s32 #extern "putchar"
 
 char: s32 = 65
 while char != 91 {

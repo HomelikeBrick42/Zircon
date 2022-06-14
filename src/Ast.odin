@@ -146,6 +146,10 @@ AstProcedure :: struct {
 	right_arrow_token:       Token,
 	return_type:             AstExpression,
 	resolved_return_type:    Type,
+	extern_token:            Maybe(Token),
+	extern_string_token:     Maybe(
+		Token,
+	), // TODO: make this a calculated string value, so it could be computed from other constants at compile time
 }
 
 GetType :: proc(expression: AstExpression) -> Type {

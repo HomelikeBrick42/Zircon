@@ -128,6 +128,10 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		proc_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 		proc_.right_arrow_token = Lexer_ExpectToken(lexer, .RightArrow) or_return
 		proc_.return_type = ParseExpression(lexer) or_return
+		if Lexer_CurrentToken(lexer^) or_return.kind == .Extern {
+			proc_.extern_token = Lexer_ExpectToken(lexer, .Extern) or_return
+			proc_.extern_string_token = Lexer_ExpectToken(lexer, .String) or_return
+		}
 		return proc_, nil
 	case .Name:
 		name := new(AstName)

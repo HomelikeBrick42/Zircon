@@ -236,7 +236,7 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		case ^AstDeclaration:
 			return true
 		case ^AstExternDeclaration:
-            _, ok := decl.resolved_type.(^TypeProcedure)
+			_, ok := decl.resolved_type.(^TypeProcedure)
 			return !ok
 		case:
 			unreachable()
@@ -611,10 +611,19 @@ ResolveExpression :: proc(
 			expression.resolved_return_type = EvalExpression(expression.return_type, &names).(Type)
 		}
 
-		if type, ok := suggested_type.(^TypeType); ok {
-			expression.type = type
+		if _, ok := expression.extern_token.?; ok {
+			parameter_types: [dynamic]Type
+			defer delete(parameter_types)
+			for parameter in expression.parameters {
+				append(&parameter_types, parameter.resolved_type)
+			}
+			expression.type = GetProcedureType(parameter_types[:], expression.resolved_return_type)
 		} else {
-			expression.type = &DefaultTypeType
+			if type, ok := suggested_type.(^TypeType); ok {
+				expression.type = type
+			} else {
+				expression.type = &DefaultTypeType
+			}
 		}
 
 		return nil

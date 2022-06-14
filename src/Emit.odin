@@ -85,11 +85,13 @@ EmitDefaultValue :: proc(
 	return id
 }
 
-CollectAllExterns :: proc(ast: Ast, externs: ^map[^AstExternDeclaration]bool) {
-	CollectAllExternsStatement :: proc(
-		statement: AstStatement,
-		externs: ^map[^AstExternDeclaration]bool,
-	) {
+Extern :: union #shared_nil {
+	^AstExternDeclaration,
+	^AstProcedure,
+}
+
+CollectAllExterns :: proc(ast: Ast, externs: ^map[Extern]bool) {
+	CollectAllExternsStatement :: proc(statement: AstStatement, externs: ^map[Extern]bool) {
 		switch statement in statement {
 		case ^AstScope:
 			for statement in statement.statements {
@@ -126,7 +128,7 @@ CollectAllExterns :: proc(ast: Ast, externs: ^map[^AstExternDeclaration]bool) {
 
 	CollectAllExternsExpression :: proc(
 		expression: AstExpression,
-		externs: ^map[^AstExternDeclaration]bool,
+		externs: ^map[Extern]bool,
 	) {
 		switch expression in expression {
 		case ^AstUnary:
@@ -150,8 +152,9 @@ CollectAllExterns :: proc(ast: Ast, externs: ^map[^AstExternDeclaration]bool) {
 			// do nothing
 			break
 		case ^AstProcedure:
-			_, ok := expression.type.(^TypeType)
-			assert(ok)
+			if _, ok := expression.extern_token.?; ok {
+				externs[expression] = true
+			}
 		case:
 			unreachable()
 		}
@@ -187,17 +190,31 @@ int main(int argc, char** argv) {{
 }}
 `,
 		)
-		externs: map[^AstExternDeclaration]bool
+		externs: map[Extern]bool
 		defer delete(externs)
 		CollectAllExterns(ast, &externs)
 		if len(externs) > 0 {
 			fmt.sbprintf(buffer, "\n")
 			for extern, ok in externs {
 				if ok {
-					PrintIndent(indent, buffer)
-					fmt.sbprintf(buffer, "extern ")
-					EmitType_C(extern.resolved_type, extern.name_token.data.(string), 0, buffer, false)
-					fmt.sbprintf(buffer, ";\n")
+					switch extern in extern {
+					case ^AstExternDeclaration:
+						PrintIndent(indent, buffer)
+						fmt.sbprintf(buffer, "extern ")
+						EmitType_C(extern.resolved_type, extern.name_token.data.(string), 0, buffer)
+						fmt.sbprintf(buffer, ";\n")
+					case ^AstProcedure:
+						EmitType_C(
+							GetType(extern),
+							extern.extern_string_token.?.data.(string),
+							indent,
+							buffer,
+							false,
+						)
+						fmt.sbprintf(buffer, ";\n")
+					case:
+						unreachable()
+					}
 				}
 			}
 		}
@@ -760,7 +777,17 @@ EmitExpression_C :: proc(
 			fmt.sbprintf(buffer, " = %d;\n", uintptr(type))
 			return id
 		} else {
-			unimplemented()
+			name := expression.extern_string_token.?.data.(string)
+			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = &%s;\n", name)
+			return id
 		}
 	case:
 		unreachable()

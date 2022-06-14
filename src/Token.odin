@@ -25,6 +25,7 @@ TokenKind :: enum {
 	EndOfFile,
 	Newline,
 	Name,
+	String,
 	Integer,
 
 	// Symbols
@@ -141,6 +142,8 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "{newline}"
 	case .Name:
 		return "{name}"
+	case .String:
+		return "{string}"
 	case .Integer:
 		return "{integer}"
 	case .OpenParenthesis:
@@ -208,6 +211,8 @@ Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))
+	case .String:
+		return fmt.aprintf("\"%s\"", token.data.(string))
 	case .Integer:
 		return fmt.aprintf("%d", token.data.(u128))
 	}
