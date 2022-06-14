@@ -236,7 +236,8 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		case ^AstDeclaration:
 			return true
 		case ^AstExternDeclaration:
-			return true
+            _, ok := decl.resolved_type.(^TypeProcedure)
+			return !ok
 		case:
 			unreachable()
 		}
