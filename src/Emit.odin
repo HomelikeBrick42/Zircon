@@ -282,7 +282,7 @@ EmitStatement_C :: proc(statement: AstStatement, indent: uint, buffer: ^strings.
 		)
 		EmitType_C(
 			statement.resolved_type,
-			fmt.tprintf("_%d", uintptr(statement)),
+			fmt.tprintf("%s_%d", name, uintptr(statement)),
 			indent,
 			buffer,
 		)
@@ -394,7 +394,7 @@ EmitAddressOf_C :: proc(
 				expression.name_token.filepath,
 			)
 			EmitType_C(GetPointerType(decl.resolved_type), fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, " = &_%d;\n", uintptr(decl))
+			fmt.sbprintf(buffer, " = &%s_%d;\n", decl.name_token.data.(string), uintptr(decl))
 			return id
 		case ^AstExternDeclaration:
 			unimplemented()
@@ -736,7 +736,7 @@ EmitExpression_C :: proc(
 				expression.name_token.filepath,
 			)
 			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
+			fmt.sbprintf(buffer, " = %s_%d;\n", decl.name_token.data.(string), uintptr(decl))
 			return id
 		case ^AstExternDeclaration:
 			id := GetID()
