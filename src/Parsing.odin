@@ -56,6 +56,13 @@ ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)
 		while.condition = ParseExpression(lexer) or_return
 		while.body = ParseScope(lexer) or_return
 		return while, nil
+	case .Extern:
+		declaration := new(AstExternDeclaration)
+		declaration.extern_token = Lexer_ExpectToken(lexer, .Extern) or_return
+		declaration.name_token = Lexer_ExpectToken(lexer, .Name) or_return
+		declaration.colon_token = Lexer_ExpectToken(lexer, .Colon) or_return
+		declaration.type = ParseExpression(lexer) or_return
+		return declaration, nil
 	case .Name:
 		copy := lexer^
 		name_token := Lexer_ExpectToken(lexer, .Name) or_return
@@ -103,6 +110,25 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		expression := ParseExpression(lexer) or_return
 		Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 		return expression, nil
+	case .Proc:
+		proc_ := new(AstProcedure)
+		proc_.proc_token = Lexer_ExpectToken(lexer, .Proc) or_return
+		proc_.open_parenthesis_token = Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
+		for {
+			AllowNewline(lexer) or_return
+			if Lexer_CurrentToken(lexer^) or_return.kind == .CloseParenthesis do break
+			parameter := new(AstDeclaration)
+			parameter.name_token = Lexer_ExpectToken(lexer, .Name) or_return
+			parameter.colon_token = Lexer_ExpectToken(lexer, .Colon) or_return
+			parameter.type = ParseExpression(lexer) or_return
+			append(&proc_.parameters, parameter)
+			if Lexer_CurrentToken(lexer^) or_return.kind == .CloseParenthesis do break
+			Lexer_ExpectToken(lexer, .Comma) or_return
+		}
+		proc_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		proc_.right_arrow_token = Lexer_ExpectToken(lexer, .RightArrow) or_return
+		proc_.return_type = ParseExpression(lexer) or_return
+		return proc_, nil
 	case .Name:
 		name := new(AstName)
 		name.name_token = Lexer_ExpectToken(lexer, .Name) or_return

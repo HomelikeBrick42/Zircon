@@ -10,6 +10,7 @@ Ast :: union #shared_nil {
 AstStatement :: union #shared_nil {
 	^AstScope,
 	^AstDeclaration,
+	^AstExternDeclaration,
 	^AstAssignment,
 	^AstIf,
 	^AstWhile,
@@ -24,6 +25,7 @@ AstExpression :: union #shared_nil {
 	^AstDereference,
 	^AstName,
 	^AstInteger,
+	^AstProcedure,
 }
 
 AstFile :: struct {
@@ -45,6 +47,14 @@ AstDeclaration :: struct {
 	type:          Maybe(AstExpression),
 	equal_token:   Maybe(Token),
 	value:         Maybe(AstExpression),
+}
+
+AstExternDeclaration :: struct {
+	resolved_type: Type,
+	extern_token:  Token,
+	name_token:    Token,
+	colon_token:   Token,
+	type:          AstExpression,
 }
 
 AstAssignment :: struct {
@@ -127,6 +137,17 @@ AstInteger :: struct {
 	integer_token: Token,
 }
 
+AstProcedure :: struct {
+	type:                    Type,
+	proc_token:              Token,
+	open_parenthesis_token:  Token,
+	parameters:              [dynamic]^AstDeclaration,
+	close_parenthesis_token: Token,
+	right_arrow_token:       Token,
+	return_type:             AstExpression,
+	resolved_return_type:    Type,
+}
+
 GetType :: proc(expression: AstExpression) -> Type {
 	switch expression in expression {
 	case ^AstUnary:
@@ -142,6 +163,8 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstName:
 		return GetDeclType(expression.resolved_decl)
 	case ^AstInteger:
+		return expression.type
+	case ^AstProcedure:
 		return expression.type
 	case:
 		unreachable()
@@ -202,19 +225,32 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			PrintHeader("Declaration", ast.name_token.location, nil, indent)
 			PrintIndent(indent + 1)
 			fmt.printf("Name: '%s'\n", ast.name_token.data.(string))
+			if type, ok := ast.type.?; ok {
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpAst(AstStatement(type), indent + 2)
+			}
 			if ast.resolved_type != nil {
 				PrintIndent(indent + 1)
 				fmt.println("Resolved Type:")
 				DumpType(ast.resolved_type, indent + 2)
-			} else if type, ok := ast.type.?; ok {
-				PrintIndent(indent + 1)
-				fmt.println("Type:")
-				DumpAst(AstStatement(type), indent + 2)
 			}
 			if value, ok := ast.value.?; ok {
 				PrintIndent(indent + 1)
 				fmt.println("Value:")
 				DumpAst(AstStatement(value), indent + 2)
+			}
+		case ^AstExternDeclaration:
+			PrintHeader("Declaration", ast.name_token.location, nil, indent)
+			PrintIndent(indent + 1)
+			fmt.printf("Name: '%s'\n", ast.name_token.data.(string))
+			PrintIndent(indent + 1)
+			fmt.println("Type:")
+			DumpAst(AstStatement(ast.type), indent + 2)
+			if ast.resolved_type != nil {
+				PrintIndent(indent + 1)
+				fmt.println("Resolved Type:")
+				DumpType(ast.resolved_type, indent + 2)
 			}
 		case ^AstAssignment:
 			PrintHeader("Assignment", ast.equal_token.location, nil, indent)
@@ -292,6 +328,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				PrintHeader("Integer", ast.integer_token.location, ast.type, indent)
 				PrintIndent(indent + 1)
 				fmt.println("Value:", ast.integer_token.data.(u128))
+			case ^AstProcedure:
+				unimplemented()
 			case:
 				unreachable()
 			}

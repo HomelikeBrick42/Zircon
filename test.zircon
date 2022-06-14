@@ -1,7 +1,8 @@
-i: int
-p := ^i
-while (^p)^^ != 10 {
-    print_int(i)
-    println()
-    p^ = i + 1
+#extern putchar: proc(char: s32) -> s32
+
+char: s32 = 65
+while char != 91 {
+    putchar(char)
+    char = char + 1
 }
+putchar(10)

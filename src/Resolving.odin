@@ -16,14 +16,12 @@ Builtin :: enum {
 	U32,
 	U64,
 	Bool,
-	PrintInt,
-	PrintBool,
-	Println,
 }
 
 Decl :: union {
 	Builtin,
 	^AstDeclaration,
+	^AstExternDeclaration,
 }
 
 GetDeclType :: proc(decl: Decl) -> Type {
@@ -32,16 +30,12 @@ GetDeclType :: proc(decl: Decl) -> Type {
 		switch decl {
 		case .Void, .Type, .Int, .S8, .S16, .S32, .S64, .UInt, .U8, .U16, .U32, .U64, .Bool:
 			return &DefaultTypeType
-		case .PrintInt:
-			return GetProcedureType({Type(&DefaultIntType)}, &DefaultIntType)
-		case .PrintBool:
-			return GetProcedureType({Type(&DefaultBoolType)}, &DefaultIntType)
-		case .Println:
-			return GetProcedureType({}, &DefaultVoidType)
 		case:
 			unreachable()
 		}
 	case ^AstDeclaration:
+		return decl.resolved_type
+	case ^AstExternDeclaration:
 		return decl.resolved_type
 	case:
 		unreachable()
@@ -144,6 +138,42 @@ ResolveStatement :: proc(
 		}
 		scope[name] = statement
 		return nil
+	case ^AstExternDeclaration:
+		ResolveExpression(statement.type, names, &DefaultTypeType) or_return
+		if !IsConstant(statement.type) {
+			return Error{
+				location = statement.name_token.location,
+				message = fmt.aprintf("Declaration type must be a constant"),
+			}
+		}
+		ExpectTypeKind(
+			GetType(statement.type),
+			TypeType,
+			statement.colon_token.location,
+		) or_return
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			statement.resolved_type = EvalExpression(statement.type, &names).(Type)
+		}
+
+		name := statement.name_token.data.(string)
+		scope := &names[len(names) - 1]
+		if _, ok := scope[name]; ok {
+			return Error{
+				location = statement.name_token.location,
+				message = fmt.aprintf("'%v' is already declared", name),
+			}
+		}
+		scope[name] = statement
+
+		return nil
 	case ^AstAssignment:
 		ResolveExpression(statement.operand, names, nil) or_return
 		if !IsAddressable(statement.operand) {
@@ -200,9 +230,19 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 	case ^AstDereference:
 		return true
 	case ^AstName:
-		_, ok := expression.resolved_decl.(Builtin)
-		return !ok
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			return false
+		case ^AstDeclaration:
+			return true
+		case ^AstExternDeclaration:
+			return true
+		case:
+			unreachable()
+		}
 	case ^AstInteger:
+		return false
+	case ^AstProcedure:
 		return false
 	case:
 		unreachable()
@@ -222,10 +262,21 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 	case ^AstDereference:
 		return false
 	case ^AstName:
-		_, ok := expression.resolved_decl.(Builtin)
-		return ok
+		switch decl in expression.resolved_decl {
+		case Builtin:
+			return true
+		case ^AstDeclaration:
+			return false
+		case ^AstExternDeclaration:
+			return false
+		case:
+			unreachable()
+		}
 	case ^AstInteger:
 		return true
+	case ^AstProcedure:
+		_, ok := expression.type.(^TypeType)
+		return ok
 	case:
 		unreachable()
 	}
@@ -446,15 +497,6 @@ ResolveExpression :: proc(
 		case "bool":
 			expression.resolved_decl = Builtin.Bool
 			return nil
-		case "print_int":
-			expression.resolved_decl = Builtin.PrintInt
-			return nil
-		case "print_bool":
-			expression.resolved_decl = Builtin.PrintBool
-			return nil
-		case "println":
-			expression.resolved_decl = Builtin.Println
-			return nil
 		case:
 			return Error{
 				location = expression.name_token.location,
@@ -536,6 +578,44 @@ ResolveExpression :: proc(
 				unreachable()
 			}
 		}
+		return nil
+	case ^AstProcedure:
+		append(names, Scope{})
+		for parameter in expression.parameters {
+			ResolveStatement(parameter, names) or_return
+		}
+		delete(pop(names))
+
+		ResolveExpression(expression.return_type, names, &DefaultTypeType) or_return
+		if !IsConstant(expression.return_type) {
+			return Error{
+				location = expression.right_arrow_token.location,
+				message = fmt.aprintf("Return type must be a constant"),
+			}
+		}
+		ExpectTypeKind(
+			GetType(expression.return_type),
+			TypeType,
+			expression.right_arrow_token.location,
+		) or_return
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			expression.resolved_return_type = EvalExpression(expression.return_type, &names).(Type)
+		}
+
+		if type, ok := suggested_type.(^TypeType); ok {
+			expression.type = type
+		} else {
+			expression.type = &DefaultTypeType
+		}
+
 		return nil
 	case:
 		unreachable()

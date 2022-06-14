@@ -47,6 +47,31 @@ Lexer_NextToken :: proc(lexer: ^Lexer) -> (token: Token, error: Maybe(Error)) {
 	for {
 		start_location := lexer.location
 
+		if Lexer_CurrentChar(lexer^) == '#' {
+			Lexer_NextChar(lexer)
+			for
+			    unicode.is_alpha(Lexer_CurrentChar(lexer^)) || unicode.is_number(
+				    Lexer_CurrentChar(lexer^),
+			    ) || Lexer_CurrentChar(lexer^) == '_' {
+				Lexer_NextChar(lexer)
+			}
+
+			name := lexer.source[start_location.position + 1:lexer.position]
+			if kind, ok := TokenKind_GetDirectiveKind(name).?; ok {
+				return Token{
+					kind = kind,
+					location = start_location,
+					length = lexer.position - start_location.position,
+					data = nil,
+				}, nil
+			}
+			error = Error {
+				location = start_location,
+				message  = fmt.aprintf("Unknown directive #%s", name),
+			}
+			return {}, error
+		}
+
 		if unicode.is_alpha(Lexer_CurrentChar(lexer^)) || Lexer_CurrentChar(lexer^) == '_' {
 			for
 			    unicode.is_alpha(Lexer_CurrentChar(lexer^)) || unicode.is_number(

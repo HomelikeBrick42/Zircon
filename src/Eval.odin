@@ -104,6 +104,8 @@ EvalStatement :: proc(statement: AstStatement, names: ^[dynamic]EvalScope) {
 		}
 		name := statement.name_token.data.(string)
 		names[len(names) - 1][statement] = value
+	case ^AstExternDeclaration:
+		unreachable()
 	case ^AstAssignment:
 		operand := EvalAddressOf(statement.operand, names)
 		value := EvalExpression(statement.value, names)
@@ -204,12 +206,6 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 				return Type(&DefaultU64Type)
 			case .Bool:
 				return Type(&DefaultBoolType)
-			case .PrintInt:
-				unimplemented()
-			case .PrintBool:
-				unimplemented()
-			case .Println:
-				unimplemented()
 			case:
 				unreachable()
 			}
@@ -220,11 +216,13 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 				}
 			}
 			unreachable()
+		case ^AstExternDeclaration:
+			unreachable()
 		case:
 			unreachable()
 		}
 	case ^AstInteger:
-        type := GetType(expression).(^TypeInt)
+		type := GetType(expression).(^TypeInt)
 		if type.signed {
 			switch type.size {
 			case 1:
@@ -251,6 +249,17 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 			case:
 				unreachable()
 			}
+		}
+	case ^AstProcedure:
+		if _, ok := expression.type.(^TypeType); ok {
+			parameter_types: [dynamic]Type
+			defer delete(parameter_types)
+			for parameter in expression.parameters {
+				append(&parameter_types, parameter.resolved_type)
+			}
+			return GetProcedureType(parameter_types[:], expression.resolved_return_type)
+		} else {
+			unimplemented()
 		}
 	case:
 		unreachable()
@@ -280,10 +289,14 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 				}
 			}
 			unreachable()
+		case ^AstExternDeclaration:
+			unreachable()
 		case:
 			unreachable()
 		}
 	case ^AstInteger:
+		unreachable()
+	case ^AstProcedure:
 		unreachable()
 	case:
 		unreachable()

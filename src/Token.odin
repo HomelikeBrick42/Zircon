@@ -35,6 +35,7 @@ TokenKind :: enum {
 	Colon,
 	Comma,
 	Equal,
+	RightArrow,
 
 	// Operators
 	Plus,
@@ -50,6 +51,10 @@ TokenKind :: enum {
 	If,
 	Else,
 	While,
+	Proc,
+
+	// Directives
+	Extern,
 }
 
 TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
@@ -60,6 +65,17 @@ TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
 		return .Else
 	case "while":
 		return .While
+	case "proc":
+		return .Proc
+	case:
+		return nil
+	}
+}
+
+TokenKind_GetDirectiveKind :: proc(name: string) -> Maybe(TokenKind) {
+	switch name {
+	case "extern":
+		return .Extern
 	case:
 		return nil
 	}
@@ -108,6 +124,8 @@ TokenKind_GetDoubleCharKind :: proc(first: rune, second: rune) -> Maybe(TokenKin
 		return .EqualEqual
 	case {'!', '='}:
 		return .ExclamationMarkEqual
+	case {'-', '>'}:
+		return .RightArrow
 	case:
 		return nil
 	}
@@ -139,6 +157,8 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return ","
 	case .Equal:
 		return "="
+	case .RightArrow:
+		return "->"
 	case .Plus:
 		return "+"
 	case .Minus:
@@ -161,6 +181,10 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "else"
 	case .While:
 		return "while"
+	case .Proc:
+		return "proc"
+	case .Extern:
+		return "#extern"
 	}
 	return "{invalid}"
 }
@@ -180,7 +204,7 @@ TokenData :: union {
 Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	switch token.kind {
-	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .Caret, .If, .Else, .While:
+	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .Colon, .Comma, .Equal, .RightArrow, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .Caret, .If, .Else, .While, .Proc, .Extern:
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))

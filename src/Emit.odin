@@ -19,7 +19,13 @@ PrintIndent :: proc(indent: uint, buffer: ^strings.Builder) {
 	}
 }
 
-EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Builder) {
+EmitType_C :: proc(
+	type: Type,
+	name: string,
+	indent: uint,
+	buffer: ^strings.Builder,
+	emit_proc_type_as_pointer := true,
+) {
 	switch type in type {
 	case ^TypeVoid:
 		PrintIndent(indent, buffer)
@@ -36,7 +42,11 @@ EmitType_C :: proc(type: Type, name: string, indent: uint, buffer: ^strings.Buil
 	case ^TypePointer:
 		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
 	case ^TypeProcedure:
-		EmitType_C(type.return_type, fmt.tprintf("(*%s)", name), indent, buffer)
+		if emit_proc_type_as_pointer {
+			EmitType_C(type.return_type, fmt.tprintf("(*%s)", name), indent, buffer)
+		} else {
+			EmitType_C(type.return_type, name, indent, buffer)
+		}
 		fmt.sbprintf(buffer, "(")
 		for parameter_type in type.parameter_types {
 			EmitType_C(parameter_type, "", 0, buffer)
@@ -75,13 +85,96 @@ EmitDefaultValue :: proc(
 	return id
 }
 
+CollectAllExterns :: proc(ast: Ast, externs: ^map[^AstExternDeclaration]bool) {
+	CollectAllExternsStatement :: proc(
+		statement: AstStatement,
+		externs: ^map[^AstExternDeclaration]bool,
+	) {
+		switch statement in statement {
+		case ^AstScope:
+			for statement in statement.statements {
+				CollectAllExternsStatement(statement, externs)
+			}
+		case ^AstDeclaration:
+			if type, ok := statement.type.?; ok {
+				CollectAllExternsExpression(type, externs)
+			}
+			if value, ok := statement.value.?; ok {
+				CollectAllExternsExpression(value, externs)
+			}
+		case ^AstExternDeclaration:
+			CollectAllExternsExpression(statement.type, externs)
+			externs[statement] = true
+		case ^AstAssignment:
+			CollectAllExternsExpression(statement.operand, externs)
+			CollectAllExternsExpression(statement.value, externs)
+		case ^AstIf:
+			CollectAllExternsExpression(statement.condition, externs)
+			CollectAllExternsStatement(statement.then_body, externs)
+			if else_body, ok := statement.else_body.?; ok {
+				CollectAllExternsStatement(else_body, externs)
+			}
+		case ^AstWhile:
+			CollectAllExternsExpression(statement.condition, externs)
+			CollectAllExternsStatement(statement.body, externs)
+		case AstExpression:
+			CollectAllExternsExpression(statement, externs)
+		case:
+			unreachable()
+		}
+	}
+
+	CollectAllExternsExpression :: proc(
+		expression: AstExpression,
+		externs: ^map[^AstExternDeclaration]bool,
+	) {
+		switch expression in expression {
+		case ^AstUnary:
+			CollectAllExternsExpression(expression.operand, externs)
+		case ^AstBinary:
+			CollectAllExternsExpression(expression.left, externs)
+			CollectAllExternsExpression(expression.right, externs)
+		case ^AstCall:
+			CollectAllExternsExpression(expression.operand, externs)
+			for argument in expression.arguments {
+				CollectAllExternsExpression(argument, externs)
+			}
+		case ^AstAddressOf:
+			CollectAllExternsExpression(expression.operand, externs)
+		case ^AstDereference:
+			CollectAllExternsExpression(expression.operand, externs)
+		case ^AstName:
+			// do nothing
+			break
+		case ^AstInteger:
+			// do nothing
+			break
+		case ^AstProcedure:
+			_, ok := expression.type.(^TypeType)
+			assert(ok)
+		case:
+			unreachable()
+		}
+	}
+
+	switch ast in ast {
+	case ^AstFile:
+		for statement in ast.statements {
+			CollectAllExternsStatement(statement, externs)
+		}
+	case AstStatement:
+		CollectAllExternsStatement(ast, externs)
+	case:
+		unreachable()
+	}
+}
+
 EmitAst_C :: proc(ast: Ast, indent: uint, buffer: ^strings.Builder) {
 	switch ast in ast {
 	case ^AstFile:
 		fmt.sbprintf(
 			buffer,
-			`#include <stdio.h>
-#include <stdint.h>
+			`#include <stdint.h>
 #include <stdbool.h>
 
 typedef uint64_t Type;
@@ -92,22 +185,25 @@ int main(int argc, char** argv) {{
     _builtin_main();
     return 0;
 }}
-
-static int64_t _builtin_print_int(int64_t value) {{
-    return (int64_t)printf("%%lld", value);
-}}
-
-static int64_t _builtin_print_bool(bool value) {{
-    return (int64_t)printf(value ? "true" : "false");
-}}
-
-static void _builtin_println(void) {{
-    printf("\n");
-}}
-
-static void _builtin_main(void) {{
 `,
 		)
+		externs: map[^AstExternDeclaration]bool
+		defer delete(externs)
+		CollectAllExterns(ast, &externs)
+		if len(externs) > 0 {
+			fmt.sbprintf(buffer, "\n")
+			for extern, ok in externs {
+				if ok {
+					PrintIndent(indent, buffer)
+					fmt.sbprintf(buffer, "extern ")
+					EmitType_C(extern.resolved_type, extern.name_token.data.(string), 0, buffer, false)
+					fmt.sbprintf(buffer, ";\n")
+				}
+			}
+		}
+		fmt.sbprintf(buffer, "\n")
+		PrintIndent(indent, buffer)
+		fmt.sbprintf(buffer, "static void _builtin_main(void) {{\n")
 		for statement in ast.statements {
 			EmitStatement_C(statement, indent + 1, buffer)
 		}
@@ -174,6 +270,9 @@ EmitStatement_C :: proc(statement: AstStatement, indent: uint, buffer: ^strings.
 			buffer,
 		)
 		fmt.sbprintf(buffer, " = _%d;\n", value)
+	case ^AstExternDeclaration:
+		// do nothing
+		break
 	case ^AstAssignment:
 		operand := EmitAddressOf_C(statement.operand, indent, buffer)
 		value := EmitExpression_C(statement.value, indent, buffer)
@@ -280,10 +379,14 @@ EmitAddressOf_C :: proc(
 			EmitType_C(GetPointerType(decl.resolved_type), fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = &_%d;\n", uintptr(decl))
 			return id
+		case ^AstExternDeclaration:
+			unimplemented()
 		case:
 			unreachable()
 		}
 	case ^AstInteger:
+		unreachable()
+	case ^AstProcedure:
 		unreachable()
 	case:
 		unreachable()
@@ -604,39 +707,6 @@ EmitExpression_C :: proc(
 				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
 				fmt.sbprintf(buffer, " = %d;\n", uintptr(&DefaultBoolType))
 				return id
-			case .PrintInt:
-				id := GetID()
-				fmt.sbprintf(
-					buffer,
-					"#line %d \"%s\"\n",
-					expression.name_token.line,
-					expression.name_token.filepath,
-				)
-				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
-				fmt.sbprintf(buffer, " = &_builtin_print_int;\n")
-				return id
-			case .PrintBool:
-				id := GetID()
-				fmt.sbprintf(
-					buffer,
-					"#line %d \"%s\"\n",
-					expression.name_token.line,
-					expression.name_token.filepath,
-				)
-				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
-				fmt.sbprintf(buffer, " = &_builtin_print_bool;\n")
-				return id
-			case .Println:
-				id := GetID()
-				fmt.sbprintf(
-					buffer,
-					"#line %d \"%s\"\n",
-					expression.name_token.line,
-					expression.name_token.filepath,
-				)
-				EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
-				fmt.sbprintf(buffer, " = &_builtin_println;\n")
-				return id
 			case:
 				unreachable()
 			}
@@ -650,6 +720,17 @@ EmitExpression_C :: proc(
 			)
 			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = _%d;\n", uintptr(decl))
+			return id
+		case ^AstExternDeclaration:
+			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = %s;\n", decl.name_token.data.(string))
 			return id
 		case:
 			unreachable()
@@ -666,6 +747,21 @@ EmitExpression_C :: proc(
 		EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = %d;\n", value)
 		return id
+	case ^AstProcedure:
+		if type, ok := expression.type.(^TypeType); ok {
+			id := GetID()
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = %d;\n", uintptr(type))
+			return id
+		} else {
+			unimplemented()
+		}
 	case:
 		unreachable()
 	}
