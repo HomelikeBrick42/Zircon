@@ -3,6 +3,8 @@
 char: s32 = 65
 while char != 91 {
     putchar(char)
+    putchar(char + 32)
+    putchar(32)
     char = char + 1
 }
 putchar(10)
