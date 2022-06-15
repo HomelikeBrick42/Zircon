@@ -368,13 +368,60 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				PrintIndent(indent + 1)
 				fmt.println("Value:", ast.integer_token.data.(u128))
 			case ^AstProcedure:
-				unimplemented()
+				PrintHeader("Procedure", ast.open_parenthesis_token.location, GetType(ast), indent)
+				for parameter, i in ast.parameters {
+					PrintIndent(indent + 1)
+					fmt.printf("Parameter %d:\n", i + 1)
+					DumpAst(AstStatement(parameter), indent + 2)
+				}
+				PrintIndent(indent + 1)
+				fmt.println("Return Type:")
+				DumpAst(AstStatement(ast.return_type), indent + 2)
+				if ast.resolved_return_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Return Type:")
+					DumpType(ast.resolved_return_type, indent + 2)
+				}
+				PrintIndent(indent + 1)
+				fmt.println("#extern:", ast.extern_token != nil)
 			case ^AstArray:
-				unimplemented()
+				PrintHeader("Array", ast.open_square_bracket_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Length:")
+				DumpAst(AstStatement(ast.length), indent + 2)
+				if ast.resolved_inner_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Length:", ast.resolved_length)
+				}
+				PrintIndent(indent + 1)
+				fmt.println("Inner Type:")
+				DumpAst(AstStatement(ast.inner_type), indent + 2)
+				if ast.resolved_inner_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Inner Type:")
+					DumpType(ast.resolved_inner_type, indent + 2)
+				}
 			case ^AstIndex:
-				unimplemented()
+				PrintHeader("Index", ast.open_square_bracket_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Operand:")
+				DumpAst(AstStatement(ast.operand), indent + 2)
+				PrintIndent(indent + 1)
+				fmt.println("Index:")
+				DumpAst(AstStatement(ast.index), indent + 2)
 			case ^AstCast:
-				unimplemented()
+				PrintHeader("Cast", ast.cast_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpAst(AstStatement(ast.type), indent + 2)
+				if ast.resolved_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Type:")
+					DumpType(ast.resolved_type, indent + 2)
+				}
+				PrintIndent(indent + 1)
+				fmt.println("Operand:")
+				DumpAst(AstStatement(ast.operand), indent + 2)
 			case:
 				unreachable()
 			}
