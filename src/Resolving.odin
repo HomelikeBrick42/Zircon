@@ -38,7 +38,7 @@ GetDeclType :: proc(decl: Decl) -> Type {
 	case ^AstExternDeclaration:
 		return decl.resolved_type
 	case:
-		unreachable()
+		return nil
 	}
 }
 

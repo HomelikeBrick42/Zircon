@@ -188,11 +188,17 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstBinary:
 		return expression.type
 	case ^AstCall:
-		return GetType(expression.operand).(^TypeProcedure).return_type
+		type := GetType(expression.operand)
+		if type == nil do return nil
+		return type.(^TypeProcedure).return_type
 	case ^AstAddressOf:
-		return GetPointerType(GetType(expression.operand))
+		type := GetType(expression.operand)
+		if type == nil do return nil
+		return GetPointerType(type)
 	case ^AstDereference:
-		return GetType(expression.operand).(^TypePointer).pointer_to
+		type := GetType(expression.operand)
+		if type == nil do return nil
+		return type.(^TypePointer).pointer_to
 	case ^AstName:
 		return GetDeclType(expression.resolved_decl)
 	case ^AstInteger:
@@ -202,7 +208,9 @@ GetType :: proc(expression: AstExpression) -> Type {
 	case ^AstArray:
 		return expression.type
 	case ^AstIndex:
-		return GetType(expression.operand).(^TypeArray).inner_type
+		type := GetType(expression.operand)
+		if type == nil do return nil
+		return type.(^TypeArray).inner_type
 	case ^AstCast:
 		return expression.resolved_type
 	case:
