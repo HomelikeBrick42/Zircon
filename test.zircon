@@ -1,6 +1,6 @@
 putchar := proc(char: s32) -> s32 #extern "putchar"
 
-array: [100]u8
+array: [cast(u8) (cast(s8) 10 * 10)]u8
 
 {
     i := 0

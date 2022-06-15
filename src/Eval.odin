@@ -17,6 +17,68 @@ Value :: union {
 	bool,
 }
 
+Value_GetInteger :: proc(value: Value) -> i128 {
+	switch value in value {
+	case Type:
+		unreachable()
+	case ^Value:
+		unreachable()
+	case []Value:
+		unreachable()
+	case i8:
+		return i128(value)
+	case i16:
+		return i128(value)
+	case i32:
+		return i128(value)
+	case i64:
+		return i128(value)
+	case u8:
+		return i128(value)
+	case u16:
+		return i128(value)
+	case u32:
+		return i128(value)
+	case u64:
+		return i128(value)
+	case bool:
+		unreachable()
+	case:
+		unreachable()
+	}
+}
+
+Value_IntegerFromType :: proc(value: i128, type: ^TypeInt) -> Value {
+	switch type.size {
+	case 1:
+		if type.signed {
+			return i8(value)
+		} else {
+			return u8(value)
+		}
+	case 2:
+		if type.signed {
+			return i16(value)
+		} else {
+			return u16(value)
+		}
+	case 4:
+		if type.signed {
+			return i32(value)
+		} else {
+			return u32(value)
+		}
+	case 8:
+		if type.signed {
+			return i64(value)
+		} else {
+			return u64(value)
+		}
+	case:
+		unreachable()
+	}
+}
+
 EvalScope :: map[^AstDeclaration]Value
 
 GetDefaultValue :: proc(type: Type) -> Value {
@@ -172,9 +234,15 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		case .Pointer:
 			return GetPointerType(operand.(Type))
 		case .Identity:
-			return +operand.(i64)
+			return Value_IntegerFromType(
+				+Value_GetInteger(operand),
+				GetType(expression).(^TypeInt),
+			)
 		case .Negation:
-			return -operand.(i64)
+			return Value_IntegerFromType(
+				-Value_GetInteger(operand),
+				GetType(expression).(^TypeInt),
+			)
 		case .LogicalNot:
 			return !operand.(bool)
 		case:
@@ -187,13 +255,21 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		case .Invalid:
 			unreachable()
 		case .Addition:
-			return left.(i64) + right.(i64)
+			left := Value_GetInteger(left)
+			right := Value_GetInteger(right)
+			return Value_IntegerFromType(left + right, GetType(expression).(^TypeInt))
 		case .Subtraction:
-			return left.(i64) - right.(i64)
+			left := Value_GetInteger(left)
+			right := Value_GetInteger(right)
+			return Value_IntegerFromType(left - right, GetType(expression).(^TypeInt))
 		case .Multiplication:
-			return left.(i64) * right.(i64)
+			left := Value_GetInteger(left)
+			right := Value_GetInteger(right)
+			return Value_IntegerFromType(left * right, GetType(expression).(^TypeInt))
 		case .Division:
-			return left.(i64) / right.(i64)
+			left := Value_GetInteger(left)
+			right := Value_GetInteger(right)
+			return Value_IntegerFromType(left / right, GetType(expression).(^TypeInt))
 		case .Equal:
 			return Value_Equal(left, right)
 		case .NotEqual:
@@ -206,7 +282,7 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 	case ^AstDereference:
 		return EvalExpression(expression.operand, names).(^Value)^
 	case ^AstCall:
-        unreachable()
+		unreachable()
 	case ^AstName:
 		switch decl in expression.resolved_decl {
 		case Builtin:
@@ -290,14 +366,17 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 			}
 			return GetProcedureType(parameter_types[:], expression.resolved_return_type)
 		} else {
-            unreachable()
+			unreachable()
 		}
 	case ^AstArray:
 		return GetArrayType(expression.resolved_inner_type, expression.resolved_length)
 	case ^AstIndex:
-		unimplemented()
+		operand := EvalExpression(expression.operand, names)
+		index := EvalExpression(expression.index, names)
+		return operand.([]Value)[Value_GetInteger(index)]
 	case ^AstCast:
-		unimplemented()
+		value := Value_GetInteger(EvalExpression(expression.operand, names))
+		return Value_IntegerFromType(value, expression.resolved_type.(^TypeInt))
 	case:
 		unreachable()
 	}
@@ -338,9 +417,11 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 	case ^AstArray:
 		unreachable()
 	case ^AstIndex:
-		unimplemented()
+		operand := EvalAddressOf(expression.operand, names)
+		index := EvalExpression(expression.index, names)
+		return &operand.([]Value)[Value_GetInteger(index)]
 	case ^AstCast:
-        unreachable()
+		unreachable()
 	case:
 		unreachable()
 	}

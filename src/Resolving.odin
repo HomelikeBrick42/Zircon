@@ -236,7 +236,7 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		case ^AstDeclaration:
 			return true
 		case ^AstExternDeclaration:
-            return true
+			return true
 		case:
 			unreachable()
 		}
@@ -650,7 +650,15 @@ ResolveExpression :: proc(
 				}
 				delete(names)
 			}
-			expression.resolved_length = uint(EvalExpression(expression.length, &names).(i64))
+
+			length := Value_GetInteger(EvalExpression(expression.length, &names))
+			if length < 0 {
+				return Error{
+					location = expression.open_square_bracket_token.location,
+					message = fmt.aprintf("Array size cannot be negative"),
+				}
+			}
+			expression.resolved_length = uint(length)
 			expression.resolved_inner_type = EvalExpression(expression.inner_type, &names).(Type)
 		}
 
