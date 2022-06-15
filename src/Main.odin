@@ -14,7 +14,8 @@ main :: proc() {
 		fmt.eprintf("Commands:\n")
 		fmt.eprintf("    show_tokens - prints all of the tokens in the file\n")
 		fmt.eprintf("    show_ast    - prints the ast\n")
-		fmt.eprintf("    check_ast   - type checks the ast\n")
+		fmt.eprintf("    check_ast   - type checks and prints the ast\n")
+		fmt.eprintf("    check       - type checks the program\n")
 		fmt.eprintf("    emit_c      - emits C code\n")
 		os.exit(1)
 	}
@@ -70,6 +71,26 @@ main :: proc() {
 			os.exit(1)
 		}
 		DumpAst(ast, 0)
+	case "check":
+		ast, error := ParseFile(filepath, source)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
+
+		names: [dynamic]Scope
+		defer {
+			for scope in names {
+				delete(scope)
+			}
+			delete(names)
+		}
+
+		error = ResolveAst(ast, &names)
+		if error, ok := error.?; ok {
+			fmt.eprintf("%v: %s\n", error.location, error.message)
+			os.exit(1)
+		}
 	case "emit_c":
 		ast, error := ParseFile(filepath, source)
 		if error, ok := error.?; ok {
