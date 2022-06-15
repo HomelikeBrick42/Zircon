@@ -152,31 +152,6 @@ int main(int argc, char** argv) {{
 				fmt.sbprintf(buffer, "}} _array_%d_%d;\n", array.length, uintptr(&array))
 			}
 		}
-		externs: map[Extern]bool
-		defer delete(externs)
-		CollectAllExterns(ast, &externs)
-		for extern, ok in externs {
-			if ok {
-				switch extern in extern {
-				case ^AstExternDeclaration:
-					PrintIndent(indent, buffer)
-					fmt.sbprintf(buffer, "extern ")
-					EmitType_C(extern.resolved_type, extern.name_token.data.(string), 0, buffer)
-					fmt.sbprintf(buffer, ";\n")
-				case ^AstProcedure:
-					EmitType_C(
-						GetType(extern),
-						extern.extern_string_token.?.data.(string),
-						indent,
-						buffer,
-						false,
-					)
-					fmt.sbprintf(buffer, ";\n")
-				case:
-					unreachable()
-				}
-			}
-		}
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "static void _builtin_main(void) {{\n")
 		for statement in ast.statements {
@@ -707,7 +682,41 @@ EmitExpression_C :: proc(
 				expression.name_token.filepath,
 			)
 			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, " = %s;\n", decl.name_token.data.(string))
+			fmt.sbprintf(buffer, ";\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "{{\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			PrintIndent(indent + 1, buffer)
+			fmt.sbprintf(buffer, "extern ")
+			EmitType_C(GetType(expression), decl.name_token.data.(string), 0, buffer)
+			fmt.sbprintf(buffer, ";\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			PrintIndent(indent + 1, buffer)
+			fmt.sbprintf(buffer, "_%d = %s;\n", id, decl.name_token.data.(string))
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.name_token.line,
+				expression.name_token.filepath,
+			)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "}}\n")
 			return id
 		case:
 			unreachable()
@@ -746,7 +755,45 @@ EmitExpression_C :: proc(
 				expression.proc_token.filepath,
 			)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, " = &%s;\n", name)
+			fmt.sbprintf(buffer, ";\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "{{\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			EmitType_C(
+				GetType(expression),
+				expression.extern_string_token.?.data.(string),
+				indent + 1,
+				buffer,
+				false,
+			)
+			fmt.sbprintf(buffer, ";\n")
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			PrintIndent(indent + 1, buffer)
+			fmt.sbprintf(buffer, "_%d = &%s;\n", id, name)
+			fmt.sbprintf(
+				buffer,
+				"#line %d \"%s\"\n",
+				expression.proc_token.line,
+				expression.proc_token.filepath,
+			)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "}}\n")
 			return id
 		}
 	case ^AstArray:
