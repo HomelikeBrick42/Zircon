@@ -295,6 +295,8 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 		}
 	case ^AstArray:
 		return GetArrayType(expression.resolved_inner_type, expression.resolved_length)
+	case ^AstIndex:
+		unimplemented()
 	case:
 		unreachable()
 	}
@@ -334,6 +336,8 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 		unreachable()
 	case ^AstArray:
 		unreachable()
+	case ^AstIndex:
+		unimplemented()
 	case:
 		unreachable()
 	}

@@ -240,6 +240,13 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 			}
 			call.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 			left = call
+		case .OpenSquareBracket:
+			index := new(AstIndex)
+			index.operand = left
+			index.open_square_bracket_token = Lexer_ExpectToken(lexer, .OpenSquareBracket) or_return
+			index.index = ParseExpression(lexer) or_return
+			index.close_square_bracket_token = Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
+			left = index
 		case .Caret:
 			dereference := new(AstDereference)
 			dereference.operand = left

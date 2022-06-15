@@ -247,6 +247,8 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		return false
 	case ^AstArray:
 		return false
+	case ^AstIndex:
+		return IsAddressable(expression.operand)
 	case:
 		unreachable()
 	}
@@ -282,6 +284,8 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 		return ok
 	case ^AstArray:
 		return true
+	case ^AstIndex:
+		return IsConstant(expression.operand) && IsConstant(expression.index)
 	case:
 		unreachable()
 	}
@@ -653,6 +657,20 @@ ResolveExpression :: proc(
 			expression.type = &DefaultTypeType
 		}
 
+		return nil
+	case ^AstIndex:
+		ResolveExpression(expression.operand, names, nil) or_return
+		ResolveExpression(expression.index, names, &DefaultIntType) or_return
+		ExpectTypeKind(
+			GetType(expression.operand),
+			TypeArray,
+			expression.open_square_bracket_token,
+		) or_return
+		ExpectTypeKind(
+			GetType(expression.index),
+			TypeInt,
+			expression.open_square_bracket_token,
+		) or_return
 		return nil
 	case:
 		unreachable()

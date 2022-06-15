@@ -1,10 +1,28 @@
 putchar := proc(char: s32) -> s32 #extern "putchar"
 
-char: s32 = 65
-while char != 91 {
-    putchar(char)
-    putchar(char + 32)
-    putchar(32)
-    char = char + 1
+array: [100]s32
+
+{
+    i := 0
+    char: s32 = 65
+    while char != 91 {
+        array[i] = char
+        i = i + 1
+        array[i] = char + 32
+        i = i + 1
+        array[i] = 32
+        i = i + 1
+
+        char = char + 1
+    }
+    array[i] = 10
+    i = i + 1
+    array[i] = 0
+    i = i + 1
 }
-putchar(10)
+
+i := 0
+while array[i] != 0 {
+    putchar(array[i])
+    i = i + 1
+}
