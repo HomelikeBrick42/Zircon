@@ -249,6 +249,8 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		return false
 	case ^AstIndex:
 		return IsAddressable(expression.operand)
+	case ^AstCast:
+		return false
 	case:
 		unreachable()
 	}
@@ -286,6 +288,8 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 		return true
 	case ^AstIndex:
 		return IsConstant(expression.operand) && IsConstant(expression.index)
+	case ^AstCast:
+		return IsConstant(expression.operand)
 	case:
 		unreachable()
 	}
@@ -671,6 +675,52 @@ ResolveExpression :: proc(
 			TypeInt,
 			expression.open_square_bracket_token,
 		) or_return
+		return nil
+	case ^AstCast:
+		ResolveExpression(expression.type, names, &DefaultTypeType) or_return
+		if !IsConstant(expression.type) {
+			return Error{
+				location = expression.cast_token.location,
+				message = fmt.aprintf("Cast type must be a constant"),
+			}
+		}
+		ExpectTypeKind(
+			GetType(expression.type),
+			TypeType,
+			expression.cast_token.location,
+		) or_return
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			expression.resolved_type = EvalExpression(expression.type, &names).(Type)
+		}
+
+		ResolveExpression(expression.operand, names, expression.resolved_type) or_return
+
+		valid_cast := false
+		if _, ok := expression.resolved_type.(^TypeInt); ok {
+			if _, ok := GetType(expression.operand).(^TypeInt); ok {
+				valid_cast = true
+			}
+		}
+
+		if !valid_cast {
+			return Error{
+				location = expression.cast_token.location,
+				message = fmt.aprintf(
+					"Cannot cast type %v to type %v",
+					GetType(expression.operand),
+					expression.resolved_type,
+				),
+			}
+		}
+
 		return nil
 	case:
 		unreachable()

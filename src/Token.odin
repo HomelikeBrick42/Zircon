@@ -55,6 +55,7 @@ TokenKind :: enum {
 	Else,
 	While,
 	Proc,
+	Cast,
 
 	// Directives
 	Extern,
@@ -70,6 +71,8 @@ TokenKind_GetKeywordKind :: proc(name: string) -> Maybe(TokenKind) {
 		return .While
 	case "proc":
 		return .Proc
+	case "cast":
+		return .Cast
 	case:
 		return nil
 	}
@@ -196,6 +199,8 @@ TokenKind_ToString :: proc(kind: TokenKind) -> string {
 		return "while"
 	case .Proc:
 		return "proc"
+	case .Cast:
+		return "cast"
 	case .Extern:
 		return "#extern"
 	}
@@ -217,7 +222,7 @@ TokenData :: union {
 Token_ToString :: proc(token: Token, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	switch token.kind {
-	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .OpenSquareBracket, .CloseSquareBracket, .Colon, .Comma, .Equal, .RightArrow, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .Caret, .If, .Else, .While, .Proc, .Extern:
+	case .Invalid, .EndOfFile, .Newline, .OpenParenthesis, .CloseParenthesis, .OpenBrace, .CloseBrace, .OpenSquareBracket, .CloseSquareBracket, .Colon, .Comma, .Equal, .RightArrow, .Plus, .Minus, .Asterisk, .Slash, .EqualEqual, .ExclamationMark, .ExclamationMarkEqual, .Caret, .If, .Else, .While, .Proc, .Cast, .Extern:
 		break
 	case .Name:
 		return fmt.aprintf("'%s'", token.data.(string))

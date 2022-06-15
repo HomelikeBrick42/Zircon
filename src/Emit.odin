@@ -293,6 +293,8 @@ EmitAddressOf_C :: proc(
 		EmitType_C(GetPointerType(GetType(expression)), fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = &_%d->v[_%d];\n", operand, index)
 		return id
+	case ^AstCast:
+		unreachable()
 	case:
 		unreachable()
 	}
@@ -578,6 +580,16 @@ EmitExpression_C :: proc(
 		EmitLocation(expression.open_square_bracket_token, buffer)
 		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = _%d.v[_%d];\n", operand, index)
+		return id
+	case ^AstCast:
+		operand := EmitExpression_C(expression.operand, indent, buffer)
+
+		id := GetID()
+		EmitLocation(expression.open_parenthesis_token, buffer)
+		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+		fmt.sbprintf(buffer, " = (")
+		EmitType_C(GetType(expression), "", 0, buffer)
+		fmt.sbprintf(buffer, ")_%d;\n", operand)
 		return id
 	case:
 		unreachable()

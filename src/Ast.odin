@@ -28,6 +28,7 @@ AstExpression :: union #shared_nil {
 	^AstProcedure,
 	^AstArray,
 	^AstIndex,
+	^AstCast,
 }
 
 AstFile :: struct {
@@ -171,6 +172,15 @@ AstIndex :: struct {
 	close_square_bracket_token: Token,
 }
 
+AstCast :: struct {
+	cast_token:              Token,
+	open_parenthesis_token:  Token,
+	type:                    AstExpression,
+	resolved_type:           Type,
+	close_parenthesis_token: Token,
+	operand:                 AstExpression,
+}
+
 GetType :: proc(expression: AstExpression) -> Type {
 	switch expression in expression {
 	case ^AstUnary:
@@ -193,6 +203,8 @@ GetType :: proc(expression: AstExpression) -> Type {
 		return expression.type
 	case ^AstIndex:
 		return GetType(expression.operand).(^TypeArray).inner_type
+	case ^AstCast:
+		return expression.resolved_type
 	case:
 		unreachable()
 	}
@@ -360,6 +372,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			case ^AstArray:
 				unimplemented()
 			case ^AstIndex:
+				unimplemented()
+			case ^AstCast:
 				unimplemented()
 			case:
 				unreachable()
