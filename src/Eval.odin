@@ -206,8 +206,7 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 	case ^AstDereference:
 		return EvalExpression(expression.operand, names).(^Value)^
 	case ^AstCall:
-		operand := EvalExpression(expression.operand, names)
-		unimplemented()
+        unreachable()
 	case ^AstName:
 		switch decl in expression.resolved_decl {
 		case Builtin:
@@ -291,7 +290,7 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 			}
 			return GetProcedureType(parameter_types[:], expression.resolved_return_type)
 		} else {
-			unimplemented()
+            unreachable()
 		}
 	case ^AstArray:
 		return GetArrayType(expression.resolved_inner_type, expression.resolved_length)
@@ -341,7 +340,7 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 	case ^AstIndex:
 		unimplemented()
 	case ^AstCast:
-		unimplemented()
+        unreachable()
 	case:
 		unreachable()
 	}

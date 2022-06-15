@@ -274,7 +274,25 @@ EmitAddressOf_C :: proc(
 			fmt.sbprintf(buffer, " = &%s_%d;\n", decl.name_token.data.(string), uintptr(decl))
 			return id
 		case ^AstExternDeclaration:
-			unimplemented()
+			id := GetID()
+			EmitLocation(expression.name_token, buffer)
+			EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, ";\n")
+			EmitLocation(expression.name_token, buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "{{\n")
+			EmitLocation(expression.name_token, buffer)
+			PrintIndent(indent + 1, buffer)
+			fmt.sbprintf(buffer, "extern ")
+			EmitType_C(GetType(expression), decl.name_token.data.(string), 0, buffer)
+			fmt.sbprintf(buffer, ";\n")
+			EmitLocation(expression.name_token, buffer)
+			PrintIndent(indent + 1, buffer)
+			fmt.sbprintf(buffer, "_%d = &%s;\n", id, decl.name_token.data.(string))
+			EmitLocation(expression.name_token, buffer)
+			PrintIndent(indent, buffer)
+			fmt.sbprintf(buffer, "}}\n")
+			return id
 		case:
 			unreachable()
 		}

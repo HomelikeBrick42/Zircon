@@ -131,4 +131,10 @@ SetupFormatters :: proc() {
 		return true
 	}
 	fmt.register_user_formatter(Token, WriteToken)
+
+	WriteType :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
+		io.write_string(fi.writer, Type_ToString(arg.(Type), context.temp_allocator))
+		return true
+	}
+	fmt.register_user_formatter(Type, WriteType)
 }

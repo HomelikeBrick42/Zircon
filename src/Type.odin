@@ -2,6 +2,7 @@ package zircon
 
 import "core:fmt"
 import "core:slice"
+import "core:strings"
 
 Type :: union #shared_nil {
 	^TypeVoid,
@@ -188,4 +189,77 @@ GetArrayType :: proc(inner_type: Type, length: uint) -> Type {
 		length     = length,
 	}
 	return &DefaultArrayTypes[inner_type][length]
+}
+
+Type_ToString :: proc(type: Type, allocator := context.allocator) -> string {
+	context.allocator = allocator
+	switch type in type {
+	case ^TypeVoid:
+		if type == &DefaultVoidType {
+			return fmt.aprintf("void")
+		} else {
+			return fmt.aprintf("distinct void")
+		}
+	case ^TypeType:
+		if type == &DefaultTypeType {
+			return fmt.aprintf("type")
+		} else {
+			return fmt.aprintf("distinct type")
+		}
+	case ^TypeInt:
+		switch type {
+		case &DefaultIntType:
+			return fmt.aprintf("int")
+		case &DefaultS8Type:
+			return fmt.aprintf("s8")
+		case &DefaultS16Type:
+			return fmt.aprintf("s16")
+		case &DefaultS32Type:
+			return fmt.aprintf("s32")
+		case &DefaultS64Type:
+			return fmt.aprintf("s64")
+		case &DefaultUIntType:
+			return fmt.aprintf("uint")
+		case &DefaultU8Type:
+			return fmt.aprintf("u8")
+		case &DefaultU16Type:
+			return fmt.aprintf("u16")
+		case &DefaultU32Type:
+			return fmt.aprintf("u32")
+		case &DefaultU64Type:
+			return fmt.aprintf("u64")
+		case:
+			return fmt.aprintf("distinct %s%d", type.signed ? "s" : "u", type.size * 8)
+		}
+	case ^TypeBool:
+		if type == &DefaultBoolType {
+			return fmt.aprintf("bool")
+		} else {
+			return fmt.aprintf("distinct bool")
+		}
+	case ^TypePointer:
+		return fmt.aprintf("*%s", Type_ToString(type.pointer_to, context.temp_allocator))
+	case ^TypeProcedure:
+		builder := strings.make_builder()
+		strings.write_string(&builder, "proc(")
+		for parameter, i in type.parameter_types {
+			if i > 0 {
+				strings.write_string(&builder, ", ")
+			}
+			strings.write_string(&builder, "_: ")
+			strings.write_string(&builder, Type_ToString(parameter, context.temp_allocator))
+		}
+		strings.write_string(&builder, ") -> ")
+		strings.write_string(&builder, Type_ToString(type.return_type, context.temp_allocator))
+		return strings.to_string(builder)
+	case ^TypeArray:
+		return fmt.aprintf(
+			"[%d]%s",
+			type.length,
+			Type_ToString(type.inner_type),
+			context.temp_allocator,
+		)
+	case:
+		unreachable()
+	}
 }
