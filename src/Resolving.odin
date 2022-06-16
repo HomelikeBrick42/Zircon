@@ -122,10 +122,26 @@ ResolveStatement :: proc(
 				ExpectType(
 					statement.resolved_type,
 					GetType(value),
-					statement.equal_token.?.location,
+					statement.colon_or_equal_token.?.location,
 				) or_return
 			} else {
 				statement.resolved_type = GetType(value)
+			}
+			if statement.colon_or_equal_token.?.kind == .Colon {
+				if !IsConstant(value) {
+					return Error{
+						location = statement.colon_or_equal_token.?.location,
+						message = fmt.aprintf("Value must be a constant"),
+					}
+				}
+				names: [dynamic]EvalScope
+				defer {
+					for scope in names {
+						delete(scope)
+					}
+					delete(names)
+				}
+				statement.resolved_value = EvalExpression(value, &names)
 			}
 		}
 		name := statement.name_token.data.(string)
@@ -234,7 +250,7 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		case Builtin:
 			return false
 		case ^AstDeclaration:
-			return true
+			return !IsDeclarationConstant(decl)
 		case ^AstExternDeclaration:
 			return true
 		case:
@@ -278,7 +294,7 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 		case Builtin:
 			return true
 		case ^AstDeclaration:
-			return false
+			return IsDeclarationConstant(decl)
 		case ^AstExternDeclaration:
 			return false
 		case:

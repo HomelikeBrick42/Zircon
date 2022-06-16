@@ -47,12 +47,20 @@ AstScope :: struct {
 }
 
 AstDeclaration :: struct {
-	resolved_type: Type,
-	name_token:    Token,
-	colon_token:   Token,
-	type:          Maybe(AstExpression),
-	equal_token:   Maybe(Token),
-	value:         Maybe(AstExpression),
+	resolved_type:        Type,
+	name_token:           Token,
+	colon_token:          Token,
+	type:                 Maybe(AstExpression),
+	colon_or_equal_token: Maybe(Token),
+	value:                Maybe(AstExpression),
+	resolved_value:       Maybe(Value),
+}
+
+IsDeclarationConstant :: proc(decl: ^AstDeclaration) -> bool {
+	if colon, ok := decl.colon_or_equal_token.?; ok && colon.kind == .Colon {
+		return true
+	}
+	return false
 }
 
 AstExternDeclaration :: struct {
@@ -305,6 +313,8 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 			}
 		case ^AstDeclaration:
 			PrintHeader("Declaration", ast.name_token.location, nil, indent)
+			PrintIndent(indent + 1)
+			fmt.printf("Constant: %s\n", IsDeclarationConstant(ast) ? "true" : "false")
 			PrintIndent(indent + 1)
 			fmt.printf("Name: '%s'\n", ast.name_token.data.(string))
 			if type, ok := ast.type.?; ok {

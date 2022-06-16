@@ -70,11 +70,13 @@ ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)
 			declaration := new(AstDeclaration)
 			declaration.name_token = name_token
 			declaration.colon_token = Lexer_ExpectToken(lexer, .Colon) or_return
-			if Lexer_CurrentToken(lexer^) or_return.kind != .Equal {
+			if Lexer_CurrentToken(lexer^) or_return.kind != .Equal && Lexer_CurrentToken(lexer^) or_return.kind !=
+			   .Colon {
 				declaration.type = ParseExpression(lexer) or_return
 			}
-			if Lexer_CurrentToken(lexer^) or_return.kind == .Equal {
-				declaration.equal_token = Lexer_ExpectToken(lexer, .Equal) or_return
+			if Lexer_CurrentToken(lexer^) or_return.kind == .Equal || Lexer_CurrentToken(lexer^) or_return.kind ==
+			   .Colon {
+				declaration.colon_or_equal_token = Lexer_NextToken(lexer) or_return
 				declaration.value = ParseExpression(lexer) or_return
 			}
 			return declaration, nil

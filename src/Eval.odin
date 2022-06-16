@@ -317,6 +317,9 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 				unreachable()
 			}
 		case ^AstDeclaration:
+			if IsDeclarationConstant(decl) {
+				return decl.resolved_value.?
+			}
 			for i := len(names) - 1; i >= 0; i -= 1 {
 				if value, ok := names[i][decl]; ok {
 					return value

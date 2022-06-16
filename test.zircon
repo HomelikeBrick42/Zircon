@@ -1,11 +1,11 @@
 putchar := proc(char: s32) -> s32 #extern "putchar"
 
-array: [2 * 3 + 1]u8
-array_length := size_of(type_of(array)) / size_of(type_of(array[0]))
+ArrayLength :: 2 * 3 + 1
+array: [ArrayLength]u8
 
 {
     i := 0
-    while i != array_length - 1 {
+    while i != ArrayLength - 1 {
         array[i] = 69
         i = i + 1
     }
