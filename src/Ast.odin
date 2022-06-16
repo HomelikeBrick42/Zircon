@@ -29,6 +29,9 @@ AstExpression :: union #shared_nil {
 	^AstArray,
 	^AstIndex,
 	^AstCast,
+	^AstTransmute,
+	^AstSizeOf,
+	^AstTypeOf,
 }
 
 AstFile :: struct {
@@ -181,6 +184,32 @@ AstCast :: struct {
 	operand:                 AstExpression,
 }
 
+AstTransmute :: struct {
+	transmute_token:         Token,
+	open_parenthesis_token:  Token,
+	type:                    AstExpression,
+	resolved_type:           Type,
+	close_parenthesis_token: Token,
+	operand:                 AstExpression,
+}
+
+AstSizeOf :: struct {
+	integer_type:            Type,
+	size_of_token:           Token,
+	open_parenthesis_token:  Token,
+	type:                    AstExpression,
+	resolved_type:           Type,
+	close_parenthesis_token: Token,
+}
+
+AstTypeOf :: struct {
+	type_type:               Type,
+	type_of_token:           Token,
+	open_parenthesis_token:  Token,
+	expression:              AstExpression,
+	close_parenthesis_token: Token,
+}
+
 GetType :: proc(expression: AstExpression) -> Type {
 	switch expression in expression {
 	case ^AstUnary:
@@ -213,6 +242,12 @@ GetType :: proc(expression: AstExpression) -> Type {
 		return type.(^TypeArray).inner_type
 	case ^AstCast:
 		return expression.resolved_type
+	case ^AstTransmute:
+		return expression.resolved_type
+	case ^AstSizeOf:
+		return expression.integer_type
+	case ^AstTypeOf:
+		return expression.type_type
 	case:
 		unreachable()
 	}
@@ -430,6 +465,34 @@ DumpAst :: proc(ast: Ast, indent: uint) {
 				PrintIndent(indent + 1)
 				fmt.println("Operand:")
 				DumpAst(AstStatement(ast.operand), indent + 2)
+			case ^AstTransmute:
+				PrintHeader("Transmute", ast.transmute_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpAst(AstStatement(ast.type), indent + 2)
+				if ast.resolved_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Type:")
+					DumpType(ast.resolved_type, indent + 2)
+				}
+				PrintIndent(indent + 1)
+				fmt.println("Operand:")
+				DumpAst(AstStatement(ast.operand), indent + 2)
+			case ^AstSizeOf:
+				PrintHeader("Size Of", ast.size_of_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Type:")
+				DumpAst(AstStatement(ast.type), indent + 2)
+				if ast.resolved_type != nil {
+					PrintIndent(indent + 1)
+					fmt.println("Resolved Type:")
+					DumpType(ast.resolved_type, indent + 2)
+				}
+			case ^AstTypeOf:
+				PrintHeader("Type Of", ast.type_of_token.location, GetType(ast), indent)
+				PrintIndent(indent + 1)
+				fmt.println("Expression:")
+				DumpAst(AstStatement(ast.expression), indent + 2)
 			case:
 				unreachable()
 			}

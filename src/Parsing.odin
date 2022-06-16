@@ -145,6 +145,28 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		cast_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 		cast_.operand = ParseLeastExpression(lexer) or_return
 		return cast_, nil
+	case .Transmute:
+		transmute_ := new(AstTransmute)
+		transmute_.transmute_token = Lexer_ExpectToken(lexer, .Transmute) or_return
+		transmute_.open_parenthesis_token = Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
+		transmute_.type = ParseExpression(lexer) or_return
+		transmute_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		transmute_.operand = ParseLeastExpression(lexer) or_return
+		return transmute_, nil
+	case .SizeOf:
+		sizeof := new(AstSizeOf)
+		sizeof.size_of_token = Lexer_ExpectToken(lexer, .SizeOf) or_return
+		sizeof.open_parenthesis_token = Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
+		sizeof.type = ParseExpression(lexer) or_return
+		sizeof.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		return sizeof, nil
+	case .TypeOf:
+		typeof := new(AstTypeOf)
+		typeof.type_of_token = Lexer_ExpectToken(lexer, .TypeOf) or_return
+		typeof.open_parenthesis_token = Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
+		typeof.expression = ParseExpression(lexer) or_return
+		typeof.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		return typeof, nil
 	case .Name:
 		name := new(AstName)
 		name.name_token = Lexer_ExpectToken(lexer, .Name) or_return

@@ -1,28 +1,21 @@
 putchar := proc(char: s32) -> s32 #extern "putchar"
 
-array: [cast(u8) (cast(s8) 10 * 10)]u8
+array: [2 * 3 + 1]u8
+array_length := size_of(type_of(array)) / size_of(type_of(array[0]))
 
 {
     i := 0
-    char: u8 = 65
-    while char != 91 {
-        array[i] = char
+    while i != array_length - 1 {
+        array[i] = 69
         i = i + 1
-        array[i] = char + 32
-        i = i + 1
-        array[i] = 32
-        i = i + 1
-
-        char = char + 1
     }
-    array[i] = 10
-    i = i + 1
     array[i] = 0
-    i = i + 1
 }
 
-i := 0
-while array[i] != 0 {
-    putchar(cast(s32) array[i])
-    i = i + 1
+{
+    i := 0
+    while array[i] != 0 {
+        putchar(cast(s32) array[i])
+        i = i + 1
+    }
 }

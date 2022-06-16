@@ -263,3 +263,24 @@ Type_ToString :: proc(type: Type, allocator := context.allocator) -> string {
 		unreachable()
 	}
 }
+
+Type_GetSize :: proc(type: Type) -> uint {
+	switch type in type {
+	case ^TypeVoid:
+		return 0
+	case ^TypeType:
+		return 8
+	case ^TypeInt:
+		return type.size
+	case ^TypeBool:
+		return 1
+	case ^TypePointer:
+		return 8
+	case ^TypeProcedure:
+		return 8
+	case ^TypeArray:
+		return Type_GetSize(type.inner_type) * type.length
+	case:
+		unreachable()
+	}
+}

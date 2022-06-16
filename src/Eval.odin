@@ -377,6 +377,15 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 	case ^AstCast:
 		value := Value_GetInteger(EvalExpression(expression.operand, names))
 		return Value_IntegerFromType(value, expression.resolved_type.(^TypeInt))
+	case ^AstTransmute:
+		unreachable()
+	case ^AstSizeOf:
+		return Value_IntegerFromType(
+			i128(Type_GetSize(expression.resolved_type)),
+			expression.integer_type.(^TypeInt),
+		)
+	case ^AstTypeOf:
+		return GetType(expression.expression)
 	case:
 		unreachable()
 	}
@@ -421,6 +430,12 @@ EvalAddressOf :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) -> 
 		index := EvalExpression(expression.index, names)
 		return &operand.([]Value)[Value_GetInteger(index)]
 	case ^AstCast:
+		unreachable()
+	case ^AstTransmute:
+		unreachable()
+	case ^AstSizeOf:
+		unreachable()
+	case ^AstTypeOf:
 		unreachable()
 	case:
 		unreachable()

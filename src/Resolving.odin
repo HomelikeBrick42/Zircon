@@ -250,6 +250,12 @@ IsAddressable :: proc(expression: AstExpression) -> bool {
 		return IsAddressable(expression.operand)
 	case ^AstCast:
 		return false
+	case ^AstTransmute:
+		return false
+	case ^AstSizeOf:
+		return false
+	case ^AstTypeOf:
+		return false
 	case:
 		unreachable()
 	}
@@ -289,6 +295,12 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 		return IsConstant(expression.operand) && IsConstant(expression.index)
 	case ^AstCast:
 		return IsConstant(expression.operand)
+	case ^AstTransmute:
+		return false
+	case ^AstSizeOf:
+		return true
+	case ^AstTypeOf:
+		return true
 	case:
 		unreachable()
 	}
@@ -726,6 +738,83 @@ ResolveExpression :: proc(
 					expression.resolved_type,
 				),
 			}
+		}
+
+		return nil
+	case ^AstTransmute:
+		ResolveExpression(expression.type, names, &DefaultTypeType) or_return
+		if !IsConstant(expression.type) {
+			return Error{
+				location = expression.transmute_token.location,
+				message = fmt.aprintf("Transmute type must be a constant"),
+			}
+		}
+		ExpectTypeKind(
+			GetType(expression.type),
+			TypeType,
+			expression.transmute_token.location,
+		) or_return
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			expression.resolved_type = EvalExpression(expression.type, &names).(Type)
+		}
+
+		ResolveExpression(expression.operand, names, expression.resolved_type) or_return
+
+		if Type_GetSize(GetType(expression.operand)) != Type_GetSize(expression.resolved_type) {
+			return Error{
+				location = expression.transmute_token.location,
+				message = fmt.aprintf("Cannot transmute types because they have different sizes"),
+			}
+		}
+
+		return nil
+	case ^AstSizeOf:
+		ResolveExpression(expression.type, names, &DefaultTypeType) or_return
+		if !IsConstant(expression.type) {
+			return Error{
+				location = expression.size_of_token.location,
+				message = fmt.aprintf("SizeOf type must be a constant"),
+			}
+		}
+		ExpectTypeKind(
+			GetType(expression.type),
+			TypeType,
+			expression.size_of_token.location,
+		) or_return
+
+		{
+			names: [dynamic]EvalScope
+			defer {
+				for scope in names {
+					delete(scope)
+				}
+				delete(names)
+			}
+			expression.resolved_type = EvalExpression(expression.type, &names).(Type)
+		}
+
+		if type, ok := suggested_type.(^TypeInt); ok {
+			expression.integer_type = type
+		} else {
+			expression.integer_type = &DefaultIntType
+		}
+
+		return nil
+	case ^AstTypeOf:
+		ResolveExpression(expression.expression, names, nil) or_return
+
+		if type, ok := suggested_type.(^TypeType); ok {
+			expression.type_type = type
+		} else {
+			expression.type_type = &DefaultTypeType
 		}
 
 		return nil

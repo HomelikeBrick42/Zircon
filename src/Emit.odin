@@ -313,6 +313,12 @@ EmitAddressOf_C :: proc(
 		return id
 	case ^AstCast:
 		unreachable()
+	case ^AstTransmute:
+		unreachable()
+	case ^AstSizeOf:
+		unreachable()
+	case ^AstTypeOf:
+		unreachable()
 	case:
 		unreachable()
 	}
@@ -603,11 +609,35 @@ EmitExpression_C :: proc(
 		operand := EmitExpression_C(expression.operand, indent, buffer)
 
 		id := GetID()
-		EmitLocation(expression.open_parenthesis_token, buffer)
+		EmitLocation(expression.cast_token, buffer)
 		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
 		fmt.sbprintf(buffer, " = (")
 		EmitType_C(GetType(expression), "", 0, buffer)
 		fmt.sbprintf(buffer, ")_%d;\n", operand)
+		return id
+	case ^AstTransmute:
+		operand := EmitExpression_C(expression.operand, indent, buffer)
+
+		id := GetID()
+		EmitLocation(expression.transmute_token, buffer)
+		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+		fmt.sbprintf(buffer, " = *(")
+		EmitType_C(GetPointerType(GetType(expression)), "", 0, buffer)
+		fmt.sbprintf(buffer, ")&_%d;\n", operand)
+		return id
+	case ^AstSizeOf:
+		value := Type_GetSize(expression.resolved_type)
+		id := GetID()
+		EmitLocation(expression.size_of_token, buffer)
+		EmitType_C(expression.integer_type, fmt.tprintf("_%d", id), indent, buffer)
+		fmt.sbprintf(buffer, " = %d;\n", value)
+		return id
+	case ^AstTypeOf:
+		id := GetID()
+		EmitLocation(expression.type_of_token, buffer)
+		EmitType_C(GetType(expression), fmt.tprintf("_%d", id), indent, buffer)
+		type := GetType(expression.expression)
+		fmt.sbprintf(buffer, " = %d;\n", (^uintptr)(&type)^)
 		return id
 	case:
 		unreachable()
