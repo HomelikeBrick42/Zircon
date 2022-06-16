@@ -368,7 +368,7 @@ EmitExpression_C :: proc(
 			id := GetID()
 			EmitLocation(expression.operator_token, buffer)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
-			fmt.sbprintf(buffer, "  = _%d + _%d;\n", left, right)
+			fmt.sbprintf(buffer, " = _%d + _%d;\n", left, right)
 			return id
 		case .Subtraction:
 			id := GetID()
