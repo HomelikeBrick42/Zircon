@@ -48,7 +48,10 @@ EmitType_C :: proc(
 			EmitType_C(type.return_type, name, indent, buffer)
 		}
 		fmt.sbprintf(buffer, "(")
-		for parameter_type in type.parameter_types {
+		for parameter_type, i in type.parameter_types {
+            if i > 0 {
+                fmt.sbprintf(buffer, ", ")
+            }
 			EmitType_C(parameter_type, "", 0, buffer)
 		}
 		fmt.sbprintf(buffer, ")")
