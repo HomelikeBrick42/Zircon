@@ -40,12 +40,17 @@ EmitType_C :: proc(
 		PrintIndent(indent, buffer)
 		fmt.sbprintf(buffer, "bool %s", name)
 	case ^TypePointer:
-		EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
-	case ^TypeProcedure:
-		if emit_proc_type_as_pointer {
-			EmitType_C(type.return_type, fmt.tprintf("(*%s)", name), indent, buffer)
+		if name == "" {
+			EmitType_C(type.pointer_to, "*", indent, buffer)
 		} else {
-			EmitType_C(type.return_type, name, indent, buffer)
+			EmitType_C(type.pointer_to, fmt.tprintf("(*%s)", name), indent, buffer)
+		}
+	case ^TypeProcedure:
+		EmitType_C(type.return_type, "", indent, buffer)
+		if emit_proc_type_as_pointer {
+			fmt.sbprintf(buffer, "(*%s)", name)
+		} else {
+			fmt.sbprintf(buffer, "%s", name)
 		}
 		fmt.sbprintf(buffer, "(")
 		for parameter_type, i in type.parameter_types {
