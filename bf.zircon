@@ -1,0 +1,101 @@
+putchar := proc(char: s32) -> s32 #extern "putchar"
+getchar := proc() -> s32 #extern "getchar"
+
+GreaterThan :: 62
+LessThan :: 60
+Plus :: 43
+Minus :: 45
+Period :: 46
+Comma :: 44
+OpenBracket :: 91
+CloseBracket :: 93
+
+code: [1000]u8
+{
+	char := getchar()
+	i := 0
+	while char != -1 {
+		if char == 0 {
+			char = -1
+		} else {
+			if char == 10 {
+				char = -1
+			} else {
+				code[i] = cast(u8) char
+				char = getchar()
+				i = i + 1
+			}
+		}
+	}
+}
+
+data: [1000]u8
+{
+	ip := 0
+	dp := 0
+	while code[ip] != 0 {
+		inst := cast(int) code[ip]
+		if inst == GreaterThan {
+			dp = dp + 1
+		}
+		if inst == LessThan {
+			dp = dp - 1
+		}
+		if inst == Plus {
+			data[dp] = data[dp] + 1
+		}
+		if inst == Minus {
+			data[dp] = data[dp] - 1
+		}
+		if inst == Period {
+			putchar(cast(s32) data[dp])
+		}
+		if inst == Comma {
+			data[dp] = cast(u8) getchar()
+		}
+		if inst == OpenBracket {
+			if data[dp] == 0 {
+				continue := 0 == 0
+				depth := 0
+				while continue {
+					if depth == 0 {
+						if cast(int) code[ip] == CloseBracket {
+							continue = 0 != 0
+						}
+						ip = ip - 1
+					} else {
+						ip = ip + 1
+					}
+					if cast(int) code[ip] == OpenBracket {
+						depth = depth + 1
+					}
+					if cast(int) code[ip] == CloseBracket {
+						depth = depth - 1
+					}
+				}
+			}
+		}
+		if inst == CloseBracket {
+			if data[dp] != 0 {
+				continue := 0 == 0
+				depth := 0
+				while continue {
+					if depth == 0 {
+						if cast(int)  code[ip] == OpenBracket {
+							continue = 0 != 0
+						}
+					} else {
+						ip = ip - 1
+					}
+					if cast(int) code[ip] == OpenBracket {
+						depth = depth - 1
+					}
+					if cast(int) code[ip] == CloseBracket {
+						depth = depth + 1
+					}
+				}
+			}
+		}
+		ip = ip + 1
+	}
+}
