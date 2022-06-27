@@ -112,14 +112,18 @@ EmitDefaultValue_C :: proc(
 		fmt.sbprintf(buffer, "#line %d \"%s\"\n", location.line, location.filepath)
 		id := GetID()
 		EmitType_C(type, fmt.tprintf("_%d", id), indent, buffer)
-		fmt.sbprintf(buffer, " = {{ .v = {{ ")
-		for i in 0 ..< type.length {
-			if i != 0 {
-				fmt.sbprintf(buffer, ", ")
+		if type.length > 0 {
+			fmt.sbprintf(buffer, " = {{ .v = {{ ")
+			for i in 0 ..< type.length {
+				if i != 0 {
+					fmt.sbprintf(buffer, ", ")
+				}
+				fmt.sbprintf(buffer, "_%d", value)
 			}
-			fmt.sbprintf(buffer, "_%d", value)
+			fmt.sbprintf(buffer, " }} }};\n")
+		} else {
+			fmt.sbprintf(buffer, ";\n")
 		}
-		fmt.sbprintf(buffer, " }} }};\n")
 		return id
 	case:
 		unreachable()
