@@ -6,6 +6,7 @@ Value :: union {
 	Type,
 	^Value,
 	[]Value,
+	^AstProcedure,
 	i8,
 	i16,
 	i32,
@@ -24,6 +25,8 @@ Value_GetInteger :: proc(value: Value) -> i128 {
 	case ^Value:
 		unreachable()
 	case []Value:
+		unreachable()
+	case ^AstProcedure:
 		unreachable()
 	case i8:
 		return i128(value)
@@ -201,6 +204,8 @@ Value_Equal :: proc(left: Value, right: Value) -> bool {
 			}
 		}
 		return true
+	case ^AstProcedure:
+		return left == right.(^AstProcedure)
 	case i8:
 		return left == right.(i8)
 	case i16:
@@ -369,7 +374,7 @@ EvalExpression :: proc(expression: AstExpression, names: ^[dynamic]EvalScope) ->
 			}
 			return GetProcedureType(parameter_types[:], expression.resolved_return_type)
 		} else {
-			unreachable()
+			return expression
 		}
 	case ^AstArray:
 		return GetArrayType(expression.resolved_inner_type, expression.resolved_length)

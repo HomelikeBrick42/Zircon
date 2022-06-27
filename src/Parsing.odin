@@ -70,12 +70,12 @@ ParseStatement :: proc(lexer: ^Lexer) -> (ast: AstStatement, error: Maybe(Error)
 			declaration := new(AstDeclaration)
 			declaration.name_token = name_token
 			declaration.colon_token = Lexer_ExpectToken(lexer, .Colon) or_return
-			if Lexer_CurrentToken(lexer^) or_return.kind != .Equal && Lexer_CurrentToken(lexer^) or_return.kind !=
-			   .Colon {
+			if Lexer_CurrentToken(lexer^) or_return.kind != .Equal &&
+			   Lexer_CurrentToken(lexer^) or_return.kind != .Colon {
 				declaration.type = ParseExpression(lexer) or_return
 			}
-			if Lexer_CurrentToken(lexer^) or_return.kind == .Equal || Lexer_CurrentToken(lexer^) or_return.kind ==
-			   .Colon {
+			if Lexer_CurrentToken(lexer^) or_return.kind == .Equal ||
+			   Lexer_CurrentToken(lexer^) or_return.kind == .Colon {
 				declaration.colon_or_equal_token = Lexer_NextToken(lexer) or_return
 				declaration.value = ParseExpression(lexer) or_return
 			}
@@ -134,7 +134,9 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		proc_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 		proc_.right_arrow_token = Lexer_ExpectToken(lexer, .RightArrow) or_return
 		proc_.return_type = ParseLeastExpression(lexer) or_return
-		if Lexer_CurrentToken(lexer^) or_return.kind == .Extern {
+		if Lexer_CurrentToken(lexer^) or_return.kind == .OpenBrace {
+			proc_.body = ParseScope(lexer) or_return
+		} else if Lexer_CurrentToken(lexer^) or_return.kind == .Extern {
 			proc_.extern_token = Lexer_ExpectToken(lexer, .Extern) or_return
 			proc_.extern_string_token = Lexer_ExpectToken(lexer, .String) or_return
 		}
@@ -152,7 +154,8 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		transmute_.transmute_token = Lexer_ExpectToken(lexer, .Transmute) or_return
 		transmute_.open_parenthesis_token = Lexer_ExpectToken(lexer, .OpenParenthesis) or_return
 		transmute_.type = ParseExpression(lexer) or_return
-		transmute_.close_parenthesis_token = Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
+		transmute_.close_parenthesis_token =
+			Lexer_ExpectToken(lexer, .CloseParenthesis) or_return
 		transmute_.operand = ParseLeastExpression(lexer) or_return
 		return transmute_, nil
 	case .SizeOf:
@@ -181,15 +184,16 @@ ParsePrimaryExpression :: proc(lexer: ^Lexer) -> (
 		array := new(AstArray)
 		array.open_square_bracket_token = Lexer_ExpectToken(lexer, .OpenSquareBracket) or_return
 		array.length = ParseExpression(lexer) or_return
-		array.close_square_bracket_token = Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
+		array.close_square_bracket_token =
+			Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
 		array.inner_type = ParseLeastExpression(lexer) or_return
 		return array, nil
 	case:
 		token := Lexer_NextToken(lexer) or_return
 		error = Error {
-			location = token.location,
-			message  = fmt.aprintf("Unexpected token %v", token),
-		}
+				location = token.location,
+				message  = fmt.aprintf("Unexpected token %v", token),
+			}
 		return {}, error
 	}
 }
@@ -279,9 +283,11 @@ ParseBinaryExpression :: proc(lexer: ^Lexer, parent_precedence: uint) -> (
 		case .OpenSquareBracket:
 			index := new(AstIndex)
 			index.operand = left
-			index.open_square_bracket_token = Lexer_ExpectToken(lexer, .OpenSquareBracket) or_return
+			index.open_square_bracket_token =
+				Lexer_ExpectToken(lexer, .OpenSquareBracket) or_return
 			index.index = ParseExpression(lexer) or_return
-			index.close_square_bracket_token = Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
+			index.close_square_bracket_token =
+				Lexer_ExpectToken(lexer, .CloseSquareBracket) or_return
 			left = index
 		case .Caret:
 			dereference := new(AstDereference)

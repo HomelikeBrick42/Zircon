@@ -303,8 +303,7 @@ IsConstant :: proc(expression: AstExpression) -> bool {
 	case ^AstInteger:
 		return true
 	case ^AstProcedure:
-		_, ok := expression.type.(^TypeType)
-		return ok
+		return true
 	case ^AstArray:
 		return true
 	case ^AstIndex:
@@ -651,6 +650,40 @@ ResolveExpression :: proc(
 		}
 
 		if _, ok := expression.extern_token.?; ok {
+			parameter_types: [dynamic]Type
+			defer delete(parameter_types)
+			for parameter in expression.parameters {
+				append(&parameter_types, parameter.resolved_type)
+			}
+			expression.type = GetProcedureType(parameter_types[:], expression.resolved_return_type)
+		} else if body, ok := expression.body.?; ok {
+			AllProceduresWithBodies[expression] = true
+
+			proc_scope: [dynamic]Scope
+			defer delete(proc_scope)
+			append(&proc_scope, Scope{})
+			for scope in names {
+				for name, decl in scope {
+					switch decl in decl {
+					case Builtin:
+						proc_scope[len(proc_scope) - 1][name] = decl
+					case ^AstDeclaration:
+						if IsDeclarationConstant(decl) {
+							proc_scope[len(proc_scope) - 1][name] = decl
+						}
+					case ^AstExternDeclaration:
+						proc_scope[len(proc_scope) - 1][name] = decl
+					}
+				}
+			}
+			append(&proc_scope, Scope{})
+			for parameter in expression.parameters {
+				proc_scope[len(proc_scope) - 1][parameter.name_token.data.(string)] = parameter
+			}
+			ResolveStatement(body, &proc_scope) or_return
+			delete(pop(&proc_scope))
+			delete(pop(&proc_scope))
+
 			parameter_types: [dynamic]Type
 			defer delete(parameter_types)
 			for parameter in expression.parameters {

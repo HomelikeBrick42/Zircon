@@ -160,6 +160,7 @@ AstProcedure :: struct {
 	right_arrow_token:       Token,
 	return_type:             AstExpression,
 	resolved_return_type:    Type,
+	body:                    Maybe(^AstScope),
 	extern_token:            Maybe(Token),
 	extern_string_token:     Maybe(
 		Token,

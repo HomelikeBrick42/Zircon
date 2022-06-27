@@ -54,9 +54,9 @@ EmitType_C :: proc(
 		}
 		fmt.sbprintf(buffer, "(")
 		for parameter_type, i in type.parameter_types {
-            if i > 0 {
-                fmt.sbprintf(buffer, ", ")
-            }
+			if i > 0 {
+				fmt.sbprintf(buffer, ", ")
+			}
 			EmitType_C(parameter_type, "", 0, buffer)
 		}
 		fmt.sbprintf(buffer, ")")
@@ -164,6 +164,8 @@ EmitValue_C :: proc(
 		}
 		fmt.sbprintf(buffer, " }} }};\n")
 		return id
+	case ^AstProcedure:
+		return EmitExpression_C(value, indent, buffer)
 	case i8:
 		id := GetID()
 		EmitLocation_C(location, buffer)
@@ -232,6 +234,8 @@ Extern :: union #shared_nil {
 	^AstProcedure,
 }
 
+AllProceduresWithBodies: map[^AstProcedure]bool
+
 EmitAst_C :: proc(ast: Ast, indent: uint, buffer: ^strings.Builder) {
 	switch ast in ast {
 	case ^AstFile:
@@ -259,6 +263,45 @@ int main(int argc, char** argv) {{
 				fmt.sbprintf(buffer, ";\n")
 				PrintIndent(indent, buffer)
 				fmt.sbprintf(buffer, "}} _array_%d_%d;\n", array.length, uintptr(&array))
+			}
+		}
+		for procedure, ok in AllProceduresWithBodies {
+			if ok {
+				EmitType_C(
+					procedure.type,
+					fmt.tprintf("_%d", uintptr(procedure)),
+					indent,
+					buffer,
+					false,
+				)
+				fmt.sbprintf(buffer, ";\n")
+			}
+		}
+		for procedure, ok in AllProceduresWithBodies {
+			if ok {
+				type := procedure.type.(^TypeProcedure)
+				EmitType_C(type.return_type, "", indent, buffer)
+				fmt.sbprintf(buffer, "_%d", uintptr(procedure))
+				fmt.sbprintf(buffer, "(")
+				for parameter_type, i in type.parameter_types {
+					if i > 0 {
+						fmt.sbprintf(buffer, ", ")
+					}
+					EmitType_C(
+						parameter_type,
+						fmt.tprintf(
+							"%s_%d",
+							procedure.parameters[i].name_token.data.(string),
+							uintptr(procedure.parameters[i]),
+						),
+						0,
+						buffer,
+					)
+				}
+				fmt.sbprintf(buffer, ") {{\n")
+				EmitStatement_C(procedure.body.?, indent + 1, buffer)
+				PrintIndent(indent, buffer)
+				fmt.sbprintf(buffer, "}}\n")
 			}
 		}
 		PrintIndent(indent, buffer)
@@ -294,12 +337,13 @@ EmitStatement_C :: proc(statement: AstStatement, indent: uint, buffer: ^strings.
 			if val, ok := statement.value.?; ok {
 				value = EmitExpression_C(val, indent, buffer)
 			} else {
-				value = EmitDefaultValue_C(
-					statement.resolved_type,
-					indent,
-					statement.name_token.location,
-					buffer,
-				)
+				value =
+					EmitDefaultValue_C(
+						statement.resolved_type,
+						indent,
+						statement.name_token.location,
+						buffer,
+					)
 			}
 			name := statement.name_token.data.(string)
 			EmitLocation_C(statement.name_token, buffer)
@@ -686,6 +730,12 @@ EmitExpression_C :: proc(
 			EmitLocation_C(expression.proc_token, buffer)
 			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
 			fmt.sbprintf(buffer, " = %d;\n", uintptr(type))
+			return id
+		} else if _, ok := expression.body.?; ok {
+			id := GetID()
+			EmitLocation_C(expression.proc_token, buffer)
+			EmitType_C(expression.type, fmt.tprintf("_%d", id), indent, buffer)
+			fmt.sbprintf(buffer, " = &_%d;\n", uintptr(expression))
 			return id
 		} else {
 			name := expression.extern_string_token.?.data.(string)

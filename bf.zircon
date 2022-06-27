@@ -1,5 +1,5 @@
-putchar := proc(char: s32) -> s32 #extern "putchar"
-getchar := proc() -> s32 #extern "getchar"
+putchar :: proc(char: s32) -> s32 #extern "putchar"
+getchar :: proc() -> s32 #extern "getchar"
 
 GreaterThan :: 62
 LessThan :: 60
